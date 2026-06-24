@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { StatusMessage } from '../components/StatusMessage';
+import { mezzoLogoDataUrl } from '../lib/branding';
 
 export function Login() {
   const { user, loading } = useAuth();
@@ -29,14 +30,14 @@ export function Login() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
-        <div className="brand-mark large">M</div>
+        <img className="login-logo" src={mezzoLogoDataUrl} alt="Mezzo Maths logo" />
         <h1>Mezzo Staff Portal</h1>
         <p>Attendance, reports, staff records, updates and meetings.</p>
         <StatusMessage message={message} type={type} />
         <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
         <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
         <button className="primary" disabled={busy}>{busy ? 'Signing in...' : 'Sign in'}</button>
-        <small>Admin creates staff accounts in Supabase Auth, then assigns schools from the admin page.</small>
+        <small>Admin login uses this same page. After signing in with an admin account, open the Admin page from the sidebar or go to /admin.</small>
       </form>
     </div>
   );
