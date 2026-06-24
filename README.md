@@ -4,8 +4,9 @@ A deployable React + Supabase web app for staff details updates, school-location
 
 ## Features included
 
-- Supabase Auth login
-- Staff profile update page
+- Supabase Auth login with show/hide password visibility
+- Staff profile update page with profile photo and password update
+- Admin staff creation/deletion, including initial password setup
 - Admin school setup with latitude, longitude and allowed radius
 - Staff-to-school assignment, including multiple schools per staff
 - Attendance check-in within 100m or school-defined radius
@@ -56,9 +57,11 @@ VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 VITE_COMPANY_NAME=Mezzo House Limited
 VITE_ATTENDANCE_RADIUS_M=100
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-secret-service-role-key-for-vercel-api-only
 ```
 
-You can find these under **Supabase > Project Settings > API**.
+You can find these under **Supabase > Project Settings > API**. Keep `SUPABASE_SERVICE_ROLE_KEY` private. Add it only in Vercel Environment Variables; never expose it in client code or share it publicly.
 
 ## 3. Run locally
 
@@ -73,7 +76,7 @@ Open the local URL shown in your terminal.
 
 1. Push this folder to GitHub.
 2. Import the repository into Vercel.
-3. Add the same environment variables in Vercel Project Settings.
+3. Add the environment variables in Vercel Project Settings. The staff-management API needs `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` in addition to the `VITE_` variables.
 4. Deploy.
 
 ## 5. Configure attendance auto checkout
@@ -100,16 +103,20 @@ Ghana uses UTC, so `16:05` equals 4:05pm Ghana time.
 
 Tip: You can get a school's latitude/longitude from Google Maps by right-clicking the location and copying the coordinates.
 
-## 7. Creating staff accounts
+## 7. Creating and deleting staff accounts
 
-Use Supabase Auth to create staff login accounts. Once a user is created, the trigger in `schema.sql` creates a profile automatically.
+Admin can now create staff accounts directly from the **Admin** page. The admin sets an initial password, and the staff member can sign in and later update the password from **My Details**.
 
-Admin can then:
+Admin can:
 
+- Add staff login accounts
+- Delete staff login accounts
 - Assign school locations
 - Create monthly payslip data
 - Post company updates
 - Create meeting rooms
+
+The add/delete staff feature uses the Vercel serverless function at `/api/staff`, so the project must have `SUPABASE_SERVICE_ROLE_KEY` set in Vercel. Do not put the service role key inside `VITE_` variables.
 
 ## 8. Important production notes
 
