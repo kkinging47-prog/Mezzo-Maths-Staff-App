@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Bell, CalendarCheck, FileText, Home, LogOut, MessageSquare, UserCog, Users, Video } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import { mezzoLogoDataUrl } from '../lib/branding';
 
 const itemClass = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? 'active' : ''}`;
 
@@ -10,7 +11,7 @@ export function Nav() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">M</div>
+        <img className="brand-logo" src={mezzoLogoDataUrl} alt="Mezzo Maths logo" />
         <div>
           <strong>Mezzo Staff</strong>
           <span>{profile?.full_name || profile?.email || 'Staff Portal'}</span>
