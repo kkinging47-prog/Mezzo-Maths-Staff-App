@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { StatusMessage } from '../components/StatusMessage';
+import { AdminStaffManager } from '../components/AdminStaffManager';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { dataUrlToFile, generateBirthdayCardImage } from '../lib/birthdayCard';
@@ -178,8 +179,9 @@ export function Admin() {
 
   return (
     <section>
-      <div className="page-header"><div><h1>Admin Control</h1><p>Manage schools, assignments, updates, meetings, payslips and birthday e-cards.</p></div></div>
+      <div className="page-header"><div><h1>Admin Control</h1><p>Manage staff accounts, schools, assignments, updates, meetings, payslips and birthday e-cards.</p></div></div>
       <StatusMessage message={message} type={type} />
+      <AdminStaffManager staff={staff} currentUserId={profile?.id} onChanged={loadData} onSuccess={ok} onError={fail} />
       <div className="grid two">
         <form className="panel form-grid" onSubmit={createSchool}>
           <h2>Add School Location</h2>
