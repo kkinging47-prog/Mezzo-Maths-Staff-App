@@ -88,3 +88,18 @@ code { background: #f2f4f7; padding: 2px 6px; border-radius: 6px; }
   .grid.two { grid-template-columns: 1fr; }
   .comment-form { flex-direction: column; }
 }
+.profile-photo-row { display: flex; align-items: center; gap: 18px; padding: 16px; background: #f8fafc; border: 1px solid var(--border); border-radius: 18px; }
+.profile-photo-preview { width: 130px; height: 130px; border-radius: 24px; background: #e9eef6; display: grid; place-items: center; overflow: hidden; color: var(--muted); font-weight: 800; flex: 0 0 auto; }
+.profile-photo-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.button-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.birthday-admin { grid-column: 1 / -1; }
+.birthday-preview-card { display: grid; gap: 12px; justify-items: start; }
+.birthday-preview-card img { width: min(420px, 100%); border-radius: 18px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.post-image-card { margin: 16px 0; display: grid; gap: 10px; justify-items: start; }
+.post-image-card img { width: min(520px, 100%); border-radius: 18px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.download-link { display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border-radius: 12px; background: #111827; color: #ffffff; font-weight: 800; }
+@media (max-width: 640px) {
+  .profile-photo-row { flex-direction: column; align-items: flex-start; }
+  .profile-photo-preview { width: 100%; height: 240px; }
+  .button-row { flex-direction: column; align-items: stretch; }
+}

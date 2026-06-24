@@ -49,6 +49,9 @@ export interface CompanyPost {
   title: string;
   body: string;
   priority: 'normal' | 'important' | 'urgent';
+  post_type?: 'update' | 'birthday' | string | null;
+  image_url?: string | null;
+  image_path?: string | null;
   created_at: string;
   profiles?: Pick<Profile, 'full_name' | 'email'> | null;
 }

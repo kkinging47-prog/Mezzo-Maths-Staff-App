@@ -96,6 +96,12 @@ export function Dashboard() {
               <em>{post.priority}</em>
             </div>
             <p>{post.body}</p>
+            {post.image_url && (
+              <div className="post-image-card">
+                <img src={post.image_url} alt={post.title} />
+                <a className="download-link" href={post.image_url} download={`${post.title.replace(/[^a-z0-9]+/gi, '-')}.jpg`}>Download JPG</a>
+              </div>
+            )}
             <div className="comments">
               {(comments[post.id] || []).map((comment) => (
                 <div key={comment.id} className="comment"><strong>{comment.profiles?.full_name || 'Staff'}:</strong> {comment.body}</div>

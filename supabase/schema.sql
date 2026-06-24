@@ -89,9 +89,17 @@ create table if not exists public.company_posts (
   title text not null,
   body text not null,
   priority text not null default 'normal' check (priority in ('normal','important','urgent')),
+  post_type text not null default 'update' check (post_type in ('update','birthday')),
+  image_url text,
+  image_path text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+-- Safe upgrades for existing projects that already ran an older schema.
+alter table public.company_posts add column if not exists post_type text not null default 'update';
+alter table public.company_posts add column if not exists image_url text;
+alter table public.company_posts add column if not exists image_path text;
 
 create table if not exists public.post_comments (
   id uuid primary key default gen_random_uuid(),
@@ -202,7 +210,8 @@ for each row execute function public.create_update_notifications();
 
 -- Storage buckets
 insert into storage.buckets (id, name, public) values ('attendance-selfies', 'attendance-selfies', false) on conflict (id) do nothing;
-insert into storage.buckets (id, name, public) values ('profile-photos', 'profile-photos', false) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('profile-photos', 'profile-photos', true) on conflict (id) do update set public = excluded.public;
+insert into storage.buckets (id, name, public) values ('birthday-cards', 'birthday-cards', true) on conflict (id) do update set public = excluded.public;
 
 -- Enable RLS
 alter table public.profiles enable row level security;
@@ -289,9 +298,37 @@ create policy "selfie_upload_own_folder" on storage.objects for insert to authen
 drop policy if exists "selfie_read_authenticated" on storage.objects;
 create policy "selfie_read_authenticated" on storage.objects for select to authenticated using (bucket_id = 'attendance-selfies');
 
--- Schedule: Ghana is UTC, so 16:05 is 4:05pm Ghana time. Run Monday to Friday.
--- Uncomment after confirming pg_cron is enabled in your Supabase project.
--- select cron.schedule('auto-close-attendance-4pm-ghana', '5 16 * * 1-5', 'select public.auto_checkout_attendance();');
+-- Storage policies for profile photos. Staff can upload/update inside their own folder.
+drop policy if exists "profile_photos_upload_own_folder" on storage.objects;
+create policy "profile_photos_upload_own_folder" on storage.objects for insert to authenticated with check (bucket_id = 'profile-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "profile_photos_update_own_folder" on storage.objects;
+create policy "profile_photos_update_own_folder" on storage.objects for update to authenticated using (bucket_id = 'profile-photos' and (storage.foldername(name))[1] = auth.uid()::text) with check (bucket_id = 'profile-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "profile_photos_read_authenticated" on storage.objects;
+create policy "profile_photos_read_authenticated" on storage.objects for select to authenticated using (bucket_id = 'profile-photos');
+
+-- Storage policies for birthday cards. Only admins can create cards; authenticated staff can read them.
+drop policy if exists "birthday_cards_admin_upload" on storage.objects;
+create policy "birthday_cards_admin_upload" on storage.objects for insert to authenticated with check (bucket_id = 'birthday-cards' and public.is_admin());
+drop policy if exists "birthday_cards_read_authenticated" on storage.objects;
+create policy "birthday_cards_read_authenticated" on storage.objects for select to authenticated using (bucket_id = 'birthday-cards');
+
+-- Schedule: Ghana is UTC, so 16:00 is exactly 4:00pm Ghana time. Run every day.
+-- This block safely replaces any existing job with the same name.
+do $$
+begin
+  if exists (select 1 from cron.job where jobname = 'auto-close-attendance-4pm-ghana') then
+    perform cron.unschedule(jobid)
+    from cron.job
+    where jobname = 'auto-close-attendance-4pm-ghana';
+  end if;
+
+  perform cron.schedule(
+    'auto-close-attendance-4pm-ghana',
+    '0 16 * * *',
+    $cron$select public.auto_checkout_attendance();$cron$
+  );
+end;
+$$;
 
 -- After creating the first admin user in Auth, run this with the user's email:
 -- update public.profiles set role = 'admin', full_name = 'Admin Name' where email = 'admin@example.com';
