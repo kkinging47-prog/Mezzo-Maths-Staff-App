@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { StatusMessage } from '../components/StatusMessage';
+import { PasswordInput } from '../components/PasswordInput';
 import { mezzoLogoDataUrl } from '../lib/branding';
 
 export function Login() {
@@ -35,7 +36,7 @@ export function Login() {
         <p>Attendance, reports, staff records, updates and meetings.</p>
         <StatusMessage message={message} type={type} />
         <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
-        <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+        <label>Password<PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" /></label>
         <button className="primary" disabled={busy}>{busy ? 'Signing in...' : 'Sign in'}</button>
         <small>Admin login uses this same page. After signing in with an admin account, open the Admin page from the sidebar or go to /admin.</small>
       </form>
