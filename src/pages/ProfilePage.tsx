@@ -4,15 +4,18 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 import { StatusMessage } from '../components/StatusMessage';
+import { PasswordInput } from '../components/PasswordInput';
 
 export function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
   const [form, setForm] = useState<Partial<Profile>>({});
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState('');
+  const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
   const [message, setMessage] = useState('');
   const [type, setType] = useState<'info' | 'success' | 'error'>('info');
   const [busy, setBusy] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -83,9 +86,37 @@ export function ProfilePage() {
     }
   }
 
+  async function updatePassword(event: FormEvent) {
+    event.preventDefault();
+    setMessage('');
+    if (passwordForm.newPassword.length < 6) {
+      setType('error');
+      setMessage('New password must be at least 6 characters.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setType('error');
+      setMessage('The two passwords do not match.');
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: passwordForm.newPassword });
+      if (error) throw error;
+      setType('success');
+      setMessage('Your password has been updated successfully. Use the new password next time you sign in.');
+      setPasswordForm({ newPassword: '', confirmPassword: '' });
+    } catch (error: any) {
+      setType('error');
+      setMessage(error.message || 'Could not update your password.');
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
   return (
     <section>
-      <div className="page-header"><div><h1>My Staff Details</h1><p>Keep your employment, emergency details and staff photo accurate.</p></div></div>
+      <div className="page-header"><div><h1>My Staff Details</h1><p>Keep your employment, emergency details, staff photo and password accurate.</p></div></div>
       <StatusMessage message={message} type={type} />
       <form className="panel form-grid" onSubmit={submit}>
         <div className="profile-photo-row">
@@ -114,6 +145,16 @@ export function ProfilePage() {
           <label>Guardian / Emergency Contact Number<input value={form.guardian_contact || ''} onChange={(e) => setField('guardian_contact', e.target.value)} /></label>
         </div>
         <button className="primary" disabled={busy}>{busy ? 'Saving...' : 'Save staff details'}</button>
+      </form>
+
+      <form className="panel form-grid" onSubmit={updatePassword}>
+        <h2>Update Password</h2>
+        <p className="hint">After admin gives you an initial password, you can change it here.</p>
+        <div className="grid two">
+          <label>New Password<PasswordInput value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
+          <label>Confirm New Password<PasswordInput value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
+        </div>
+        <button className="primary" disabled={passwordBusy}>{passwordBusy ? 'Updating password...' : 'Update password'}</button>
       </form>
     </section>
   );
