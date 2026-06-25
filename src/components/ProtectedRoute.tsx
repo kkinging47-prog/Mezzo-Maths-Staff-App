@@ -7,6 +7,7 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
 
   if (loading) return <div className="center-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (profile?.status === 'left') return <Navigate to="/login" replace />;
   if (adminOnly && profile?.role !== 'admin') return <Navigate to="/dashboard" replace />;
   return children;
 }
