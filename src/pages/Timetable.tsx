@@ -9,7 +9,7 @@ const durationOptions = [30, 40, 45, 50, 60];
 
 function isSupervisor(profile?: Profile | null) {
   const position = (profile?.position || '').toLowerCase();
-  return profile?.role === 'admin' || profile?.department === 'Supervision' || position.includes('supervisor');
+  return profile?.role === 'admin' || position.includes('supervisor');
 }
 
 export function Timetable() {
