@@ -4,9 +4,16 @@ import { AdminStaffManager } from '../components/AdminStaffManager';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { dataUrlToFile, generateBirthdayCardImage } from '../lib/birthdayCard';
-import { Profile, School } from '../types';
+import { AppointmentLetterRequest, Profile, School } from '../types';
 
 const defaultBirthdayMessage = 'Today marks a very special day in your life. We join you to celebrate this day and we pray that the Lord will bless you and keep you in health, strength and prosperity. We all wish you a happy birthday and we say God bless you.';
+
+type AppointmentDecisionForm = {
+  appointment_date: string;
+  position: string;
+  monthly_salary: string;
+  admin_notes: string;
+};
 
 function birthdayDateFromDob(dateOfBirth?: string | null) {
   if (!dateOfBirth) return '';
@@ -22,12 +29,26 @@ function safeName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'birthday-card';
 }
 
+function dateOnly(value?: string | null) {
+  if (!value) return '';
+  return value.length >= 10 ? value.slice(0, 10) : '';
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString();
+}
+
 export function Admin() {
   const { profile } = useAuth();
   const [message, setMessage] = useState('');
   const [type, setType] = useState<'info' | 'success' | 'error'>('info');
   const [staff, setStaff] = useState<Profile[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
+  const [appointmentRequests, setAppointmentRequests] = useState<AppointmentLetterRequest[]>([]);
+  const [appointmentForms, setAppointmentForms] = useState<Record<string, AppointmentDecisionForm>>({});
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [birthdayPreview, setBirthdayPreview] = useState('');
@@ -41,14 +62,40 @@ export function Admin() {
 
   const staffOptions = useMemo(() => staff.map((row) => ({ value: row.id, label: row.full_name || row.email || row.id })), [staff]);
   const selectedBirthdayStaff = useMemo(() => staff.find((row) => row.id === birthdayForm.staff_id), [birthdayForm.staff_id, staff]);
+  const pendingAppointmentCount = useMemo(() => appointmentRequests.filter((row) => row.status === 'pending').length, [appointmentRequests]);
 
   async function loadData() {
-    const [{ data: profileData }, { data: schoolData }] = await Promise.all([
+    const [{ data: profileData, error: profileError }, { data: schoolData, error: schoolError }, { data: appointmentData, error: appointmentError }] = await Promise.all([
       supabase.from('profiles').select('*').order('full_name'),
       supabase.from('schools').select('*').order('name'),
+      supabase.from('appointment_letter_requests').select('*, profiles:staff_id(id, full_name, email, position, date_employed, staff_no)').order('requested_at', { ascending: false }),
     ]);
+
+    if (profileError || schoolError || appointmentError) {
+      fail(profileError || schoolError || appointmentError);
+      return;
+    }
+
     setStaff((profileData || []) as Profile[]);
     setSchools((schoolData || []) as School[]);
+    const appointments = (appointmentData || []) as AppointmentLetterRequest[];
+    setAppointmentRequests(appointments);
+    setAppointmentForms((previous) => {
+      const next = { ...previous };
+      appointments.forEach((request) => {
+        const staffProfile = request.profiles;
+        if (!next[request.id]) {
+          next[request.id] = {
+            appointment_date: dateOnly(request.appointment_date) || dateOnly(staffProfile?.date_employed),
+            position: request.position || staffProfile?.position || 'Mezzo Maths Tutor',
+            monthly_salary: request.monthly_salary ? String(request.monthly_salary) : '',
+            admin_notes: request.admin_notes || '',
+          };
+        }
+      });
+      return next;
+    });
+
     if (!selectedStaffId && profileData?.[0]) setSelectedStaffId(profileData[0].id);
     if (!selectedSchoolId && schoolData?.[0]) setSelectedSchoolId(schoolData[0].id);
     if (!payrollForm.staff_id && profileData?.[0]) setPayrollForm((prev) => ({ ...prev, staff_id: profileData[0].id }));
@@ -70,7 +117,59 @@ export function Admin() {
   }, [birthdayForm.staff_id, staff]);
 
   function ok(text: string) { setType('success'); setMessage(text); }
-  function fail(error: any) { setType('error'); setMessage(error.message || 'Action failed.'); }
+  function fail(error: any) { setType('error'); setMessage(error?.message || 'Action failed.'); }
+
+  function updateAppointmentForm(id: string, patch: Partial<AppointmentDecisionForm>) {
+    setAppointmentForms((previous) => ({
+      ...previous,
+      [id]: { ...(previous[id] || { appointment_date: '', position: 'Mezzo Maths Tutor', monthly_salary: '', admin_notes: '' }), ...patch },
+    }));
+  }
+
+  async function notifyStaff(staffId: string, title: string, body: string) {
+    await supabase.from('notifications').insert({ user_id: staffId, title, body });
+  }
+
+  async function approveAppointmentRequest(request: AppointmentLetterRequest) {
+    if (!profile) return;
+    const form = appointmentForms[request.id];
+    if (!form?.appointment_date) { fail(new Error('Please add the appointment/effective date before approving.')); return; }
+    if (!form?.position) { fail(new Error('Please add the staff position before approving.')); return; }
+    if (!form?.monthly_salary || Number(form.monthly_salary) <= 0) { fail(new Error('Please add the monthly salary before approving.')); return; }
+
+    const { error } = await supabase.from('appointment_letter_requests').update({
+      status: 'approved',
+      decided_by: profile.id,
+      decided_at: new Date().toISOString(),
+      appointment_date: form.appointment_date,
+      position: form.position,
+      monthly_salary: Number(form.monthly_salary),
+      admin_notes: form.admin_notes || null,
+    }).eq('id', request.id);
+
+    if (error) fail(error); else {
+      await notifyStaff(request.staff_id, 'Appointment letter approved', 'Your appointment letter has been approved. Open Letters & Payslips to download it.');
+      ok('Appointment letter request approved. The staff member can now download the PDF from Letters & Payslips.');
+      loadData();
+    }
+  }
+
+  async function rejectAppointmentRequest(request: AppointmentLetterRequest) {
+    if (!profile) return;
+    const form = appointmentForms[request.id];
+    const { error } = await supabase.from('appointment_letter_requests').update({
+      status: 'rejected',
+      decided_by: profile.id,
+      decided_at: new Date().toISOString(),
+      admin_notes: form?.admin_notes || 'Please contact admin for more details.',
+    }).eq('id', request.id);
+
+    if (error) fail(error); else {
+      await notifyStaff(request.staff_id, 'Appointment letter request rejected', form?.admin_notes || 'Your appointment letter request was not approved. Please contact admin.');
+      ok('Appointment letter request rejected.');
+      loadData();
+    }
+  }
 
   async function createSchool(event: FormEvent) {
     event.preventDefault();
@@ -179,9 +278,61 @@ export function Admin() {
 
   return (
     <section>
-      <div className="page-header"><div><h1>Admin Control</h1><p>Manage staff accounts, schools, assignments, updates, meetings, payslips and birthday e-cards.</p></div></div>
+      <div className="page-header"><div><h1>Admin Control</h1><p>Manage staff accounts, schools, assignments, updates, meetings, payslips, appointment approvals and birthday e-cards.</p></div></div>
       <StatusMessage message={message} type={type} />
       <AdminStaffManager staff={staff} currentUserId={profile?.id} onChanged={loadData} onSuccess={ok} onError={fail} />
+
+      <div className="panel staff-admin-panel">
+        <h2>Appointment Letter Approvals {pendingAppointmentCount > 0 && <span className="pill">{pendingAppointmentCount} pending</span>}</h2>
+        <p className="hint">Staff can request appointment letters from Letters & Payslips. They can only download the appointment letter after you approve it here.</p>
+        {appointmentRequests.length === 0 ? <div className="empty">No appointment letter requests yet.</div> : (
+          <div className="table-card compact-table">
+            <table>
+              <thead><tr><th>Staff</th><th>Requested</th><th>Status</th><th>Approval Details</th><th>Action</th></tr></thead>
+              <tbody>
+                {appointmentRequests.map((request) => {
+                  const staffProfile = request.profiles;
+                  const form = appointmentForms[request.id] || { appointment_date: '', position: staffProfile?.position || 'Mezzo Maths Tutor', monthly_salary: '', admin_notes: '' };
+                  return (
+                    <tr key={request.id}>
+                      <td><strong>{staffProfile?.full_name || 'Staff Member'}</strong><br /><span className="muted">{staffProfile?.email || request.staff_id}</span></td>
+                      <td>{formatDateTime(request.requested_at)}</td>
+                      <td><span className={`pill request-${request.status}`}>{request.status}</span></td>
+                      <td>
+                        {request.status === 'pending' ? (
+                          <div className="approval-form-grid">
+                            <label>Effective Date<input type="date" value={form.appointment_date} onChange={(e) => updateAppointmentForm(request.id, { appointment_date: e.target.value })} /></label>
+                            <label>Position<input value={form.position} onChange={(e) => updateAppointmentForm(request.id, { position: e.target.value })} /></label>
+                            <label>Monthly Salary<input type="number" value={form.monthly_salary} onChange={(e) => updateAppointmentForm(request.id, { monthly_salary: e.target.value })} placeholder="1800" /></label>
+                            <label>Admin Notes<textarea value={form.admin_notes} onChange={(e) => updateAppointmentForm(request.id, { admin_notes: e.target.value })} placeholder="Optional note for approval/rejection" /></label>
+                          </div>
+                        ) : (
+                          <div className="approval-summary">
+                            <span>Effective date: {request.appointment_date || '-'}</span>
+                            <span>Position: {request.position || '-'}</span>
+                            <span>Salary: {request.monthly_salary ? `GHS ${Number(request.monthly_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</span>
+                            {request.admin_notes && <span>Notes: {request.admin_notes}</span>}
+                            <span>Decision date: {formatDateTime(request.decided_at)}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {request.status === 'pending' ? (
+                          <div className="button-row">
+                            <button type="button" className="primary small-button" onClick={() => approveAppointmentRequest(request)}>Approve</button>
+                            <button type="button" className="danger small-button" onClick={() => rejectAppointmentRequest(request)}>Reject</button>
+                          </div>
+                        ) : <span className="muted">Completed</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="grid two">
         <form className="panel form-grid" onSubmit={createSchool}>
           <h2>Add School Location</h2>
