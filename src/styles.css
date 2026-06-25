@@ -69,9 +69,9 @@ input:disabled { background: #f2f4f7; color: #667085; }
 .comment-form input { flex: 1; }
 .table-card { overflow: auto; }
 table { width: 100%; border-collapse: collapse; }
-th, td { padding: 14px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+th, td { padding: 14px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
 th { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-.pill { display: inline-flex; padding: 5px 10px; background: #eef4ff; color: #3538cd; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.pill { display: inline-flex; padding: 5px 10px; background: #eef4ff; color: #3538cd; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: capitalize; }
 .chips { display: flex; flex-wrap: wrap; gap: 10px; }
 .chip { padding: 10px 13px; border: 1px solid var(--border); background: #fff; border-radius: 999px; }
 .chip.selected { background: #ecfdf3; color: var(--primary); border-color: var(--primary); font-weight: 800; }
@@ -112,7 +112,20 @@ code { background: #f2f4f7; padding: 2px 6px; border-radius: 6px; }
 .compact-table { padding: 0; box-shadow: none; margin-bottom: 0; }
 .small-button { padding: 8px 12px; font-size: 12px; }
 button:disabled { opacity: 0.65; cursor: not-allowed; }
+.approval-card { display: grid; gap: 6px; padding: 16px; border-radius: 16px; border: 1px solid var(--border); background: #f8fafc; }
+.approval-card strong { font-size: 16px; }
+.approval-card span { color: var(--muted); }
+.approval-card.approved { background: #ecfdf3; border-color: #abefc6; }
+.approval-card.pending { background: #fffaeb; border-color: #fedf89; }
+.approval-card.rejected { background: #fef3f2; border-color: #fecdca; }
+.approval-form-grid { display: grid; gap: 10px; min-width: 320px; }
+.approval-form-grid textarea { min-height: 76px; }
+.approval-summary { display: grid; gap: 5px; color: var(--muted); }
+.request-approved { background: #ecfdf3; color: #027a48; }
+.request-pending { background: #fffaeb; color: #b54708; }
+.request-rejected { background: #fef3f2; color: #b42318; }
 @media (max-width: 640px) {
   .password-field input { padding-right: 70px; }
   .password-toggle { right: 6px; padding: 7px 8px; }
+  th, td { min-width: 160px; }
 }
