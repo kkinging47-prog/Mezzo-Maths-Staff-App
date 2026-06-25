@@ -11,6 +11,8 @@ import { ProfilePage } from './pages/ProfilePage';
 import { WeeklyReport } from './pages/WeeklyReport';
 import { Documents } from './pages/Documents';
 import { Meetings } from './pages/Meetings';
+import { WorkbookOrders } from './pages/WorkbookOrders';
+import { ReportSummary } from './pages/ReportSummary';
 import { Admin } from './pages/Admin';
 import './styles.css';
 
@@ -27,6 +29,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/reports" element={<WeeklyReport />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/meetings" element={<Meetings />} />
+            <Route path="/workbooks" element={<WorkbookOrders />} />
+            <Route path="/report-summary" element={<ProtectedRoute adminOnly><ReportSummary /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
