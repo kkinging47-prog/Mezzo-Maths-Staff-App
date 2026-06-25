@@ -82,6 +82,7 @@ alter table public.class_student_counts enable row level security;
 
 -- Attendance visible for dashboard scores
 drop policy if exists "attendance_select_own_or_admin" on public.attendance;
+drop policy if exists "attendance_select_dashboard" on public.attendance;
 create policy "attendance_select_dashboard" on public.attendance for select to authenticated using (true);
 
 -- Settings policies
@@ -107,19 +108,34 @@ drop policy if exists "activities_admin_all" on public.special_class_activities;
 create policy "activities_admin_all" on public.special_class_activities for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 -- Workbook policies
+drop policy if exists "workbook_orders_select_all" on public.workbook_orders;
 create policy "workbook_orders_select_all" on public.workbook_orders for select to authenticated using (true);
+drop policy if exists "workbook_orders_insert_own" on public.workbook_orders;
 create policy "workbook_orders_insert_own" on public.workbook_orders for insert to authenticated with check (staff_id = auth.uid());
+drop policy if exists "workbook_orders_admin_all" on public.workbook_orders;
 create policy "workbook_orders_admin_all" on public.workbook_orders for all to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "workbook_supplies_select_all" on public.workbook_supplies;
 create policy "workbook_supplies_select_all" on public.workbook_supplies for select to authenticated using (true);
+drop policy if exists "workbook_supplies_admin_insert" on public.workbook_supplies;
 create policy "workbook_supplies_admin_insert" on public.workbook_supplies for insert to authenticated with check (public.is_admin());
+drop policy if exists "workbook_supplies_admin_all" on public.workbook_supplies;
 create policy "workbook_supplies_admin_all" on public.workbook_supplies for all to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "student_counts_select_all" on public.class_student_counts;
 create policy "student_counts_select_all" on public.class_student_counts for select to authenticated using (true);
+drop policy if exists "student_counts_insert_own" on public.class_student_counts;
 create policy "student_counts_insert_own" on public.class_student_counts for insert to authenticated with check (staff_id = auth.uid());
+drop policy if exists "student_counts_update_own_or_admin" on public.class_student_counts;
 create policy "student_counts_update_own_or_admin" on public.class_student_counts for update to authenticated using (staff_id = auth.uid() or public.is_admin()) with check (staff_id = auth.uid() or public.is_admin());
 
 -- Storage policies for activity photos
+drop policy if exists "activity_photos_upload_own" on storage.objects;
 create policy "activity_photos_upload_own" on storage.objects for insert to authenticated with check (bucket_id = 'activity-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "activity_photos_read_all" on storage.objects;
 create policy "activity_photos_read_all" on storage.objects for select to authenticated using (bucket_id = 'activity-photos');
+
+-- Staff special class activities also create dashboard posts.
+drop policy if exists "posts_staff_activity_insert" on public.company_posts;
+create policy "posts_staff_activity_insert" on public.company_posts for insert to authenticated with check (author_id = auth.uid() and post_type = 'update');
 
 -- Notify staff every 2 hours before 2pm if they have not checked in; mark absent at 2pm.
 create or replace function public.attendance_reminders_and_absences()
