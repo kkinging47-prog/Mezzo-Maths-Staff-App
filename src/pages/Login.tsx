@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { StatusMessage } from '../components/StatusMessage';
 import { PasswordInput } from '../components/PasswordInput';
-import { mezzoLogoDataUrl } from '../lib/branding';
+import { CompanyLogo } from '../components/CompanyLogo';
 
 export function Login() {
   const { user, loading } = useAuth();
@@ -31,7 +31,7 @@ export function Login() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
-        <img className="login-logo" src={mezzoLogoDataUrl} alt="Mezzo Maths logo" />
+        <CompanyLogo className="login-logo" />
         <h1>Mezzo Staff Portal</h1>
         <p>Attendance, reports, staff records, updates and meetings.</p>
         <StatusMessage message={message} type={type} />
