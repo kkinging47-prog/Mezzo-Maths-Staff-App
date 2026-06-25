@@ -143,6 +143,25 @@ create table if not exists public.payrolls (
   unique (staff_id, month)
 );
 
+create table if not exists public.appointment_letter_requests (
+  id uuid primary key default gen_random_uuid(),
+  staff_id uuid not null references public.profiles(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  requested_at timestamptz not null default now(),
+  decided_by uuid references public.profiles(id),
+  decided_at timestamptz,
+  appointment_date date,
+  position text,
+  monthly_salary numeric(12,2),
+  admin_notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create unique index if not exists appointment_letter_one_pending_per_staff
+on public.appointment_letter_requests (staff_id)
+where status = 'pending';
+
 -- Auto-create profile after a Supabase Auth user is created.
 create or replace function public.handle_new_user()
 returns trigger
@@ -224,6 +243,7 @@ alter table public.post_comments enable row level security;
 alter table public.notifications enable row level security;
 alter table public.meetings enable row level security;
 alter table public.payrolls enable row level security;
+alter table public.appointment_letter_requests enable row level security;
 
 -- Policies: profiles
 drop policy if exists "profiles_select_own_or_admin" on public.profiles;
@@ -279,6 +299,8 @@ drop policy if exists "notifications_select_own" on public.notifications;
 create policy "notifications_select_own" on public.notifications for select to authenticated using (user_id = auth.uid() or user_id is null or public.is_admin());
 drop policy if exists "notifications_update_own" on public.notifications;
 create policy "notifications_update_own" on public.notifications for update to authenticated using (user_id = auth.uid() or public.is_admin()) with check (user_id = auth.uid() or public.is_admin());
+drop policy if exists "notifications_insert_admin" on public.notifications;
+create policy "notifications_insert_admin" on public.notifications for insert to authenticated with check (public.is_admin());
 
 -- Policies: meetings
 drop policy if exists "meetings_select_all" on public.meetings;
@@ -291,6 +313,16 @@ drop policy if exists "payrolls_select_own_or_admin" on public.payrolls;
 create policy "payrolls_select_own_or_admin" on public.payrolls for select to authenticated using (staff_id = auth.uid() or public.is_admin());
 drop policy if exists "payrolls_admin_all" on public.payrolls;
 create policy "payrolls_admin_all" on public.payrolls for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Policies: appointment letter requests
+drop policy if exists "appointment_requests_select_own_or_admin" on public.appointment_letter_requests;
+create policy "appointment_requests_select_own_or_admin" on public.appointment_letter_requests for select to authenticated using (staff_id = auth.uid() or public.is_admin());
+drop policy if exists "appointment_requests_insert_own" on public.appointment_letter_requests;
+create policy "appointment_requests_insert_own" on public.appointment_letter_requests for insert to authenticated with check (staff_id = auth.uid() and status = 'pending');
+drop policy if exists "appointment_requests_admin_update" on public.appointment_letter_requests;
+create policy "appointment_requests_admin_update" on public.appointment_letter_requests for update to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "appointment_requests_admin_delete" on public.appointment_letter_requests;
+create policy "appointment_requests_admin_delete" on public.appointment_letter_requests for delete to authenticated using (public.is_admin());
 
 -- Storage policy for attendance selfies. Staff upload only into their own folder.
 drop policy if exists "selfie_upload_own_folder" on storage.objects;
