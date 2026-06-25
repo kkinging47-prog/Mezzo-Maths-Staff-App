@@ -13,6 +13,7 @@ import { Documents } from './pages/Documents';
 import { Meetings } from './pages/Meetings';
 import { WorkbookOrders } from './pages/WorkbookOrders';
 import { ReportSummary } from './pages/ReportSummary';
+import { AdminDocuments } from './pages/AdminDocuments';
 import { AdminSettings } from './pages/AdminSettings';
 import { Admin } from './pages/Admin';
 import './styles.css';
@@ -32,6 +33,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/meetings" element={<Meetings />} />
             <Route path="/workbooks" element={<WorkbookOrders />} />
             <Route path="/report-summary" element={<ProtectedRoute adminOnly><ReportSummary /></ProtectedRoute>} />
+            <Route path="/admin-documents" element={<ProtectedRoute adminOnly><AdminDocuments /></ProtectedRoute>} />
             <Route path="/admin-settings" element={<ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
           </Route>
