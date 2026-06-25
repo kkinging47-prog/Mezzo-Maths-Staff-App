@@ -11,6 +11,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { WeeklyReport } from './pages/WeeklyReport';
 import { Documents } from './pages/Documents';
 import { Meetings } from './pages/Meetings';
+import { Timetable } from './pages/Timetable';
 import { WorkbookOrders } from './pages/WorkbookOrders';
 import { ReportSummary } from './pages/ReportSummary';
 import { AdminDocuments } from './pages/AdminDocuments';
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/reports" element={<WeeklyReport />} />
+            <Route path="/timetable" element={<Timetable />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/meetings" element={<Meetings />} />
             <Route path="/workbooks" element={<WorkbookOrders />} />
