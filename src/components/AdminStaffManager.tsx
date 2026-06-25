@@ -3,7 +3,8 @@ import { PasswordInput } from './PasswordInput';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 
-const departments = ['Administration', 'Marketing', 'Supervision', 'Human Resource'];
+const departments = ['Administration', 'Marketing', 'Supervision', 'Human Resource', 'Teaching'];
+const positions = ['Office Staff', 'Tutor', 'Supervisor', 'Marketer', 'Administration'];
 
 const emptyStaffForm = {
   full_name: '',
@@ -11,8 +12,8 @@ const emptyStaffForm = {
   password: '',
   staff_no: '',
   role: 'staff' as 'staff' | 'admin',
-  position: 'Mezzo Maths Tutor',
-  department: 'Supervision',
+  position: 'Tutor',
+  department: 'Teaching',
   phone: '',
   date_employed: '',
   date_of_birth: '',
@@ -97,7 +98,7 @@ export function AdminStaffManager({ staff, currentUserId, onChanged, onSuccess, 
           <label>Initial Password<PasswordInput value={newStaffForm.password} onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
           <label>Role<select value={newStaffForm.role} onChange={(e) => setNewStaffForm({ ...newStaffForm, role: e.target.value as 'staff' | 'admin' })}><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
           <label>Staff Number<input value={newStaffForm.staff_no} onChange={(e) => setNewStaffForm({ ...newStaffForm, staff_no: e.target.value })} /></label>
-          <label>Position<input value={newStaffForm.position} onChange={(e) => setNewStaffForm({ ...newStaffForm, position: e.target.value })} /></label>
+          <label>Position<select value={newStaffForm.position} onChange={(e) => setNewStaffForm({ ...newStaffForm, position: e.target.value })}>{positions.map((position) => <option key={position} value={position}>{position}</option>)}</select></label>
           <label>Department<select value={newStaffForm.department} onChange={(e) => setNewStaffForm({ ...newStaffForm, department: e.target.value })}>{departments.map((dept) => <option key={dept} value={dept}>{dept}</option>)}</select></label>
           <label>Contact Number<input value={newStaffForm.phone} onChange={(e) => setNewStaffForm({ ...newStaffForm, phone: e.target.value })} /></label>
           <label>Date Employed<input type="date" value={newStaffForm.date_employed} onChange={(e) => setNewStaffForm({ ...newStaffForm, date_employed: e.target.value })} /></label>
@@ -114,7 +115,7 @@ export function AdminStaffManager({ staff, currentUserId, onChanged, onSuccess, 
       <div className="panel staff-admin-panel">
         <h2>Staff List</h2>
         <p className="hint">Use Mark Left when a staff member has left the company. Delete should be used only when you want to permanently remove the login.</p>
-        <div className="table-card compact-table"><table><thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map((row) => <tr key={row.id}><td>{row.full_name || '-'}</td><td>{row.email || '-'}</td><td>{row.department || '-'}</td><td><span className="pill">{row.role}</span></td><td><span className={`pill status-${row.status || 'active'}`}>{row.status || 'active'}</span></td><td><div className="button-row">{row.status === 'left' ? <button type="button" className="primary small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'active')}>Restore</button> : <button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'left')}>Mark Left</button>}<button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => deleteStaff(row)}>{row.id === currentUserId ? 'Current Admin' : 'Delete'}</button></div></td></tr>)}</tbody></table></div>
+        <div className="table-card compact-table"><table><thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map((row) => <tr key={row.id}><td>{row.full_name || '-'}</td><td>{row.email || '-'}</td><td>{row.position || '-'}</td><td>{row.department || '-'}</td><td><span className="pill">{row.role}</span></td><td><span className={`pill status-${row.status || 'active'}`}>{row.status || 'active'}</span></td><td><div className="button-row">{row.status === 'left' ? <button type="button" className="primary small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'active')}>Restore</button> : <button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'left')}>Mark Left</button>}<button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => deleteStaff(row)}>{row.id === currentUserId ? 'Current Admin' : 'Delete'}</button></div></td></tr>)}</tbody></table></div>
       </div>
     </>
   );
