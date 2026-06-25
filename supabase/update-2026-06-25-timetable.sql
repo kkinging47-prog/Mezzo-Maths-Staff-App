@@ -12,7 +12,6 @@ as $$
     where id = auth.uid()
       and (
         role = 'admin'
-        or department = 'Supervision'
         or position ilike '%supervisor%'
       )
   );
@@ -34,6 +33,11 @@ create table if not exists public.staff_timetables (
 );
 
 alter table public.staff_timetables enable row level security;
+
+drop policy if exists "profiles_select_supervisor" on public.profiles;
+create policy "profiles_select_supervisor" on public.profiles
+for select to authenticated
+using (public.is_supervisor_or_admin());
 
 drop policy if exists "timetable_select_own_or_supervisor" on public.staff_timetables;
 create policy "timetable_select_own_or_supervisor" on public.staff_timetables
