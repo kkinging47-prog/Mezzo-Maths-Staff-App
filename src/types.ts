@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'staff';
+export type AppointmentLetterStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Profile {
   id: string;
@@ -82,4 +83,20 @@ export interface Payroll {
   allowances: number;
   deductions: number;
   paid_on?: string | null;
+}
+
+export interface AppointmentLetterRequest {
+  id: string;
+  staff_id: string;
+  status: AppointmentLetterStatus;
+  requested_at: string;
+  decided_by?: string | null;
+  decided_at?: string | null;
+  appointment_date?: string | null;
+  position?: string | null;
+  monthly_salary?: number | string | null;
+  admin_notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  profiles?: Pick<Profile, 'id' | 'full_name' | 'email' | 'position' | 'date_employed' | 'staff_no'> | null;
 }
