@@ -17,6 +17,7 @@ import { AdminDocuments } from './pages/AdminDocuments';
 import { AdminSettings } from './pages/AdminSettings';
 import { Admin } from './pages/Admin';
 import './styles.css';
+import './extra.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
