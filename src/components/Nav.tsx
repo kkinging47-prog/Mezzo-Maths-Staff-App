@@ -1,14 +1,16 @@
 import { NavLink } from 'react-router-dom';
-import { BarChart3, Bell, BookOpen, CalendarCheck, Clock3, FileSignature, FileText, Home, LogOut, MessageSquare, Settings, UserCog, Users, Video } from 'lucide-react';
+import { BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, FileSignature, FileText, Home, LogOut, MessageSquare, Settings, UserCog, Users, Video } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { CompanyLogo } from './CompanyLogo';
 
 const itemClass = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? 'active' : ''}`;
 function initials(name?: string | null, email?: string | null) { const source = name || email || 'Staff'; return source.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'S'; }
+function isSupervisor(position?: string | null) { return String(position || '').toLowerCase().includes('supervisor'); }
 
 export function Nav() {
   const { profile, signOut } = useAuth();
   const isAdmin = profile?.role === 'admin';
+  const supervisor = isSupervisor(profile?.position);
   return (
     <aside className="sidebar">
       <div className="brand"><CompanyLogo className="brand-logo" /><div><strong>Mezzo Staff</strong><span>Staff Portal</span></div></div>
@@ -22,7 +24,8 @@ export function Nav() {
         <NavLink to="/profile" className={itemClass}><UserCog size={18}/> My Details</NavLink>
         <NavLink to="/reports" className={itemClass}><FileText size={18}/> Weekly Report</NavLink>
         <NavLink to="/timetable" className={itemClass}><Clock3 size={18}/> Timetable</NavLink>
-        <NavLink to="/workbooks" className={itemClass}><BookOpen size={18}/> Workbooks</NavLink>
+        {(supervisor || isAdmin) && <NavLink to="/supervisor-report" className={itemClass}><ClipboardCheck size={18}/> Supervisor Report</NavLink>}
+        {!supervisor && <NavLink to="/workbooks" className={itemClass}><BookOpen size={18}/> Workbooks</NavLink>}
         <NavLink to="/documents" className={itemClass}><MessageSquare size={18}/> Letters & Payslip</NavLink>
         <NavLink to="/meetings" className={itemClass}><Video size={18}/> Meetings</NavLink>
         {isAdmin && <NavLink to="/report-summary" className={itemClass}><BarChart3 size={18}/> Report Summary</NavLink>}
