@@ -14,6 +14,19 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function clearSupabaseAuthStorage() {
+  try {
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-') && key.includes('auth-token')) localStorage.removeItem(key);
+    });
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith('sb-') && key.includes('auth-token')) sessionStorage.removeItem(key);
+    });
+  } catch {
+    // Storage may be unavailable in some private browser modes.
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -56,7 +69,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     refreshProfile,
     signOut: async () => {
-      await supabase.auth.signOut();
+      setLoading(true);
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // Continue with local cleanup and redirect even if the network call fails.
+      } finally {
+        clearSupabaseAuthStorage();
+        setLoading(false);
+        window.location.replace('/login');
+      }
     },
   }), [user, session, profile, loading]);
 
