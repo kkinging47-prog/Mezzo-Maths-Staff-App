@@ -6,6 +6,8 @@ import { distanceInMeters, getCurrentPosition, todayGhanaDate } from '../lib/loc
 import { supabase } from '../lib/supabase';
 import { AttendanceRecord, School } from '../types';
 
+function isSupervisor(position?: string | null) { return String(position || '').toLowerCase().includes('supervisor'); }
+
 export function QuickAttendance() {
   const { profile } = useAuth();
   const [schools, setSchools] = useState<School[]>([]);
@@ -19,14 +21,18 @@ export function QuickAttendance() {
 
   async function loadData() {
     if (!profile) return;
-    const { data: assigned } = await supabase.from('staff_school_assignments').select('schools(*)').eq('staff_id', profile.id);
-    const schoolList = (assigned || []).map((row: any) => row.schools).filter(Boolean) as School[];
+    const supervisor = isSupervisor(profile.position);
+    const query = supervisor || profile.role === 'admin'
+      ? supabase.from('schools').select('*').order('name')
+      : supabase.from('staff_school_assignments').select('schools(*)').eq('staff_id', profile.id);
+    const { data } = await query;
+    const schoolList = supervisor || profile.role === 'admin' ? (data || []) as School[] : (data || []).map((row: any) => row.schools).filter(Boolean) as School[];
     setSchools(schoolList);
     if (!schoolId && schoolList[0]) setSchoolId(schoolList[0].id);
     const { data: attendance } = await supabase.from('attendance').select('*, schools(*)').eq('staff_id', profile.id).eq('work_date', todayGhanaDate()).order('check_in_at', { ascending: false });
     setOpenRecord(((attendance || []) as AttendanceRecord[]).find((row) => !row.check_out_at) || null);
   }
-  useEffect(() => { loadData(); }, [profile?.id]);
+  useEffect(() => { loadData(); }, [profile?.id, profile?.position]);
 
   async function uploadSelfie(file: File, staffId: string) {
     const path = `${staffId}/${todayGhanaDate()}-${Date.now()}.jpg`;
@@ -37,7 +43,7 @@ export function QuickAttendance() {
 
   async function checkIn() {
     if (!profile || !selectedSchool) return;
-    if (!selfie) { setType('error'); setMessage('Please take your selfie before checking in.'); return; }
+    if (!selfie) { setType('error'); setMessage('Please take your photo before checking in.'); return; }
     setBusy(true); setMessage('');
     try {
       const position = await getCurrentPosition();
