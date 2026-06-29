@@ -16,15 +16,16 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 function clearSupabaseAuthStorage() {
   try {
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('sb-') && key.includes('auth-token')) localStorage.removeItem(key);
-    });
-    Object.keys(sessionStorage).forEach((key) => {
-      if (key.startsWith('sb-') && key.includes('auth-token')) sessionStorage.removeItem(key);
-    });
-  } catch {
-    // Storage may be unavailable in some private browser modes.
-  }
+    Object.keys(localStorage).forEach((key) => { if (key.startsWith('sb-') && key.includes('auth-token')) localStorage.removeItem(key); });
+    Object.keys(sessionStorage).forEach((key) => { if (key.startsWith('sb-') && key.includes('auth-token')) sessionStorage.removeItem(key); });
+  } catch {}
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms = 12000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => window.setTimeout(() => reject(new Error('Request timed out. Please refresh and try again.')), ms)),
+  ]);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -34,9 +35,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function loadProfile(userId: string) {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    if (error && error.code !== 'PGRST116') throw error;
-    setProfile(data as Profile | null);
+    try {
+      const { data, error } = await withTimeout(supabase.from('profiles').select('*').eq('id', userId).single());
+      if (error && error.code !== 'PGRST116') throw error;
+      setProfile(data as Profile | null);
+    } catch (error) {
+      console.error('Profile load failed:', error);
+      setProfile(null);
+    }
   }
 
   async function refreshProfile() {
@@ -44,22 +50,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      if (data.session?.user) await loadProfile(data.session.user.id);
-      setLoading(false);
-    });
+    let active = true;
+    async function startAuth() {
+      setLoading(true);
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession());
+        if (!active) return;
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+        if (data.session?.user) await loadProfile(data.session.user.id);
+      } catch (error) {
+        console.error('Session load failed:', error);
+        clearSupabaseAuthStorage();
+        if (active) { setSession(null); setUser(null); setProfile(null); }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    startAuth();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
-      if (nextSession?.user) await loadProfile(nextSession.user.id);
-      else setProfile(null);
-      setLoading(false);
+      if (!nextSession?.user) { setProfile(null); setLoading(false); return; }
+      window.setTimeout(async () => {
+        await loadProfile(nextSession.user.id);
+        setLoading(false);
+      }, 0);
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => { active = false; listener.subscription.unsubscribe(); };
   }, []);
 
   const value = useMemo(() => ({
@@ -73,11 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(null);
       setUser(null);
       setProfile(null);
-      try {
-        await supabase.auth.signOut({ scope: 'local' });
-      } catch {
-        // Continue with local cleanup and redirect even if the network call fails.
-      } finally {
+      try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
+      finally {
         clearSupabaseAuthStorage();
         setLoading(false);
         window.location.replace('/login');
