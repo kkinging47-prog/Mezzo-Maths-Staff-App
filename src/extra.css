@@ -34,6 +34,17 @@ html, body, #root { min-height: 100%; background: var(--bg); }
 .supervisor-filter { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
 .supervisor-filter label { min-width: 260px; }
 .logo-preview img { object-fit: contain; background: white; }
+.floating-post-button { position: fixed; right: 24px; bottom: 24px; z-index: 60; border: 0; border-radius: 999px; padding: 16px 22px; background: var(--primary); color: #fff; font-weight: 900; box-shadow: var(--shadow); cursor: pointer; }
+.floating-post-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(15, 23, 42, 0.55); display: grid; place-items: center; padding: 18px; }
+.floating-post-card { width: min(620px, 100%); max-height: 92vh; overflow-y: auto; background: #fff; border-radius: 24px; padding: 22px; box-shadow: var(--shadow); }
+.post-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.post-modal-head h2 { margin: 0; }
+.post-modal-head button { width: 40px; height: 40px; border: 0; border-radius: 50%; background: #eef2ff; font-size: 24px; cursor: pointer; }
+.post-image-preview { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 18px; border: 1px solid var(--border); background: #f8fafc; }
+.share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+.share-row span { font-size: 13px; color: var(--muted); font-weight: 800; }
+.share-row button { border: 1px solid var(--border); background: #fff; color: #0f172a; border-radius: 999px; padding: 7px 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+.share-row button:hover { background: #eff6ff; }
 @media (max-width: 920px) {
   .sidebar { position: relative; width: 100%; height: auto; max-height: 48vh; }
   .main-content { margin-left: 0; width: 100%; }
@@ -43,4 +54,5 @@ html, body, #root { min-height: 100%; background: var(--bg); }
   .summary-card { padding: 12px; }
   .dashboard-profile-card { align-items: flex-start; }
   .supervisor-filter label { min-width: 100%; }
+  .floating-post-button { right: 14px; bottom: 14px; padding: 14px 18px; }
 }
