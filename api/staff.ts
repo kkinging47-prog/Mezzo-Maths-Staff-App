@@ -3,9 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+type AdminClient = any;
+
 type StaffPayload = {
   email?: string;
   password?: string;
+  temp_password?: string;
   full_name?: string;
   staff_no?: string;
   role?: 'admin' | 'staff';
@@ -19,6 +22,7 @@ type StaffPayload = {
   home_address?: string;
   guardian_name?: string;
   guardian_contact?: string;
+  status?: string;
 };
 
 function getBearerToken(req: any) {
@@ -33,12 +37,12 @@ function readBody(req: any) {
   return req.body;
 }
 
-function cleanText(value?: string) {
+function cleanText(value?: string | null) {
   const cleaned = value?.trim();
   return cleaned ? cleaned : null;
 }
 
-async function requireAdmin(adminClient: ReturnType<typeof createClient>, accessToken: string) {
+async function requireAdmin(adminClient: AdminClient, accessToken: string) {
   if (!accessToken) throw new Error('Missing admin session token. Please sign in again.');
   const { data: userData, error: userError } = await adminClient.auth.getUser(accessToken);
   if (userError || !userData.user) throw new Error('Invalid admin session. Please sign in again.');
@@ -53,7 +57,29 @@ async function requireAdmin(adminClient: ReturnType<typeof createClient>, access
   return userData.user;
 }
 
-async function createStaff(adminClient: ReturnType<typeof createClient>, staff: StaffPayload) {
+function profilePayload(staff: StaffPayload) {
+  const email = cleanText(staff.email)?.toLowerCase();
+  return {
+    role: staff.role === 'admin' ? 'admin' : 'staff',
+    email,
+    full_name: cleanText(staff.full_name),
+    staff_no: cleanText(staff.staff_no),
+    phone: cleanText(staff.phone),
+    position: cleanText(staff.position) || 'Tutor',
+    department: cleanText(staff.department) || 'Teaching',
+    date_employed: cleanText(staff.date_employed),
+    date_of_birth: cleanText(staff.date_of_birth),
+    location: cleanText(staff.location),
+    digital_address: cleanText(staff.digital_address),
+    home_address: cleanText(staff.home_address),
+    guardian_name: cleanText(staff.guardian_name),
+    guardian_contact: cleanText(staff.guardian_contact),
+    status: staff.status === 'left' ? 'left' : 'active',
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function createStaff(adminClient: AdminClient, staff: StaffPayload) {
   const email = cleanText(staff.email)?.toLowerCase();
   const password = staff.password || '';
   const fullName = cleanText(staff.full_name);
@@ -73,31 +99,42 @@ async function createStaff(adminClient: ReturnType<typeof createClient>, staff: 
   const userId = createdUser.user?.id;
   if (!userId) throw new Error('Staff user could not be created.');
 
-  const { error: profileError } = await adminClient.from('profiles').upsert({
-    id: userId,
-    role: staff.role === 'admin' ? 'admin' : 'staff',
-    email,
-    full_name: fullName,
-    staff_no: cleanText(staff.staff_no),
-    phone: cleanText(staff.phone),
-    position: cleanText(staff.position) || 'Mezzo Maths Tutor',
-    department: cleanText(staff.department),
-    date_employed: cleanText(staff.date_employed),
-    date_of_birth: cleanText(staff.date_of_birth),
-    location: cleanText(staff.location),
-    digital_address: cleanText(staff.digital_address),
-    home_address: cleanText(staff.home_address),
-    guardian_name: cleanText(staff.guardian_name),
-    guardian_contact: cleanText(staff.guardian_contact),
-    status: 'active',
-    updated_at: new Date().toISOString(),
-  });
-
+  const payload = profilePayload({ ...staff, status: 'active' });
+  const { error: profileError } = await adminClient.from('profiles').upsert({ id: userId, ...payload });
   if (profileError) throw profileError;
   return { id: userId, email };
 }
 
-async function deleteStaff(adminClient: ReturnType<typeof createClient>, staffId: string, adminId: string) {
+async function updateStaff(adminClient: AdminClient, staffId: string, staff: StaffPayload, adminId: string) {
+  if (!staffId) throw new Error('Staff ID is required.');
+
+  const authUpdates: Record<string, any> = {};
+  const nextEmail = cleanText(staff.email)?.toLowerCase();
+  const tempPassword = staff.temp_password || staff.password || '';
+
+  if (nextEmail) authUpdates.email = nextEmail;
+  if (tempPassword) {
+    if (tempPassword.length < 6) throw new Error('Temporary password must be at least 6 characters.');
+    authUpdates.password = tempPassword;
+  }
+
+  if (Object.keys(authUpdates).length > 0) {
+    const { error: authError } = await adminClient.auth.admin.updateUserById(staffId, {
+      ...authUpdates,
+      email_confirm: true,
+      user_metadata: { full_name: cleanText(staff.full_name) || undefined },
+    });
+    if (authError) throw authError;
+  }
+
+  const payload = profilePayload(staff);
+  if (staffId === adminId) payload.status = 'active';
+  const { error: profileError } = await adminClient.from('profiles').update(payload).eq('id', staffId);
+  if (profileError) throw profileError;
+  return { id: staffId, email: nextEmail, password_reset: Boolean(tempPassword) };
+}
+
+async function deleteStaff(adminClient: AdminClient, staffId: string, adminId: string) {
   if (!staffId) throw new Error('Staff ID is required.');
   if (staffId === adminId) throw new Error('You cannot delete your own admin account while signed in.');
 
@@ -118,7 +155,7 @@ export default async function handler(req: any, res: any) {
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
-  });
+  }) as AdminClient;
 
   try {
     const body = readBody(req);
@@ -127,6 +164,11 @@ export default async function handler(req: any, res: any) {
     if (body.action === 'create') {
       const staff = await createStaff(adminClient, body.staff || {});
       return res.status(200).json({ ok: true, staff });
+    }
+
+    if (body.action === 'update') {
+      const updated = await updateStaff(adminClient, body.staff_id, body.staff || {}, adminUser.id);
+      return res.status(200).json({ ok: true, updated });
     }
 
     if (body.action === 'delete') {
