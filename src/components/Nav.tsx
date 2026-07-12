@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, FileSignature, FileText, Home, LogOut, MessageSquare, Settings, UserCog, Users, Video } from 'lucide-react';
+import { BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, FileSignature, FileText, Home, LogOut, Megaphone, MessageSquare, Settings, UserCog, Users, Video } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { CompanyLogo } from './CompanyLogo';
 
@@ -24,6 +24,7 @@ export function Nav() {
         <NavLink to="/profile" className={itemClass}><UserCog size={18}/> My Details</NavLink>
         <NavLink to="/reports" className={itemClass}><FileText size={18}/> Weekly Report</NavLink>
         <NavLink to="/timetable" className={itemClass}><Clock3 size={18}/> Timetable</NavLink>
+        <NavLink to="/marketing" className={itemClass}><Megaphone size={18}/> Marketing</NavLink>
         {(supervisor || isAdmin) && <NavLink to="/supervisor-report" className={itemClass}><ClipboardCheck size={18}/> Supervisor Report</NavLink>}
         {!supervisor && <NavLink to="/workbooks" className={itemClass}><BookOpen size={18}/> Workbooks</NavLink>}
         <NavLink to="/documents" className={itemClass}><MessageSquare size={18}/> Letters & Payslip</NavLink>
