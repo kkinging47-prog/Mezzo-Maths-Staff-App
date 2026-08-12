@@ -14,6 +14,7 @@ function initials(name?: string | null, email?: string | null) { const source = 
 
 export function Dashboard() {
   const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [posts, setPosts] = useState<CompanyPost[]>([]);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
@@ -37,10 +38,10 @@ export function Dashboard() {
   async function loadScoreboard() {
     const since = new Date(); since.setDate(since.getDate() - 6); const date = since.toISOString().slice(0, 10);
     const [{ data: profiles }, { data: attendance }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email, status').neq('status', 'left'),
+      supabase.from('profiles').select('id, full_name, email, status, role').neq('status', 'left'),
       supabase.from('attendance').select('staff_id, work_date, status').gte('work_date', date),
     ]);
-    const rows = ((profiles || []) as Profile[]).map((person) => {
+    const rows = ((profiles || []) as Profile[]).filter((person) => person.role !== 'admin').map((person) => {
       const records = (attendance || []).filter((row: any) => row.staff_id === person.id);
       const present = new Set(records.filter((row: any) => row.status !== 'absent').map((row: any) => row.work_date)).size;
       const absent = records.filter((row: any) => row.status === 'absent').length;
@@ -70,10 +71,10 @@ export function Dashboard() {
   return <section>
     <div className="page-header"><div><h1>Company Dashboard</h1><p>Updates, announcements, attendance and staff comments.</p></div></div>
     <StatusMessage message={message} type="error" />
-    <div className="grid two"><QuickAttendance /><div className="panel dashboard-profile-card">{profile?.photo_url ? <img className="staff-avatar" src={profile.photo_url} alt="Staff profile" /> : <div className="staff-avatar placeholder">{initials(profile?.full_name, profile?.email)}</div>}<div><h2>Welcome{profile?.full_name ? `, ${profile.full_name}` : ''}</h2><p className="muted">{profile?.position || 'Staff'} · {profile?.department || 'Department not set'}</p><p><strong>Academic Year:</strong> {academicYear} · {term}<br /><strong>Staff No:</strong> {profile?.staff_no || 'Not set'}<br /><strong>Salary Pay Date:</strong> {salaryDate ? new Date(salaryDate).toLocaleDateString() : 'Not announced'}</p></div></div></div>
-    <DeductionSummary profile={profile} />
+    <div className="grid two">{!isAdmin && <QuickAttendance />}<div className="panel dashboard-profile-card">{profile?.photo_url ? <img className="staff-avatar" src={profile.photo_url} alt="Staff profile" /> : <div className="staff-avatar placeholder">{initials(profile?.full_name, profile?.email)}</div>}<div><h2>Welcome{profile?.full_name ? `, ${profile.full_name}` : ''}</h2><p className="muted">{profile?.position || 'Staff'} · {profile?.department || 'Department not set'}</p><p><strong>Academic Year:</strong> {academicYear} · {term}<br /><strong>Staff No:</strong> {profile?.staff_no || 'Not set'}<br /><strong>Salary Pay Date:</strong> {salaryDate ? new Date(salaryDate).toLocaleDateString() : 'Not announced'}</p>{isAdmin && <p className="status info">Admin accounts are exempted from attendance check-in and salary deductions.</p>}</div></div></div>
+    {!isAdmin && <DeductionSummary profile={profile} />}
     <TopUsers />
-    <div className="panel"><h2>Weekly Attendance Scores</h2><p className="hint">Attendance and special activities help staff build points.</p><div className="table-card compact-table"><table><thead><tr><th>Rank</th><th>Staff</th><th>Present Days</th><th>Absent</th><th>Score</th></tr></thead><tbody>{scoreboard.map((row, index) => <tr key={row.staff_id}><td>{index + 1}</td><td>{row.name}</td><td>{row.present}</td><td>{row.absent}</td><td><strong>{row.score}</strong></td></tr>)}</tbody></table></div></div>
+    <div className="panel"><h2>Weekly Attendance Scores</h2><p className="hint">Attendance and special activities help staff build points. Admin accounts are not included.</p><div className="table-card compact-table"><table><thead><tr><th>Rank</th><th>Staff</th><th>Present Days</th><th>Absent</th><th>Score</th></tr></thead><tbody>{scoreboard.map((row, index) => <tr key={row.staff_id}><td>{index + 1}</td><td>{row.name}</td><td>{row.present}</td><td>{row.absent}</td><td><strong>{row.score}</strong></td></tr>)}</tbody></table></div></div>
     <h2>Latest Updates</h2><div className="feed">{posts.length === 0 && <div className="empty">No company updates posted yet.</div>}{posts.map((post) => <article id={`post-${post.id}`} key={post.id} className={`post priority-${post.priority}`}><div className="post-head"><div><strong>{post.title}</strong><span>{new Date(post.created_at).toLocaleString()}</span></div><em>{post.priority}</em></div><p>{post.body}</p>{post.image_url && <div className="post-image-card"><img src={post.image_url} alt={post.title} /><a className="download-link" href={post.image_url} download={`${post.title.replace(/[^a-z0-9]+/gi, '-')}.jpg`}>Download JPG</a></div>}<PostShareButtons post={post} /><div className="comments">{(comments[post.id] || []).map((comment) => <div key={comment.id} className="comment"><strong>{comment.profiles?.full_name || 'Staff'}:</strong> {comment.body}</div>)}<form className="comment-form" onSubmit={(event) => submitComment(event, post.id)}><input placeholder="Write a comment..." value={newComment[post.id] || ''} onChange={(e) => setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))} /><button>Comment</button></form></div></article>)}</div>
     <FloatingTeacherPost profile={profile} onPosted={loadPosts} />
   </section>;
