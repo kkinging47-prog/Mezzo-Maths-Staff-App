@@ -6,11 +6,11 @@ function since(days: number) { const d = new Date(); d.setDate(d.getDate() - day
 async function loadRows(days: number): Promise<Row[]> {
   const start = since(days);
   const [{ data: users }, { data: daily }, { data: activities }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, email').neq('status', 'left'),
+    supabase.from('profiles').select('id, full_name, email, role').neq('status', 'left').neq('role', 'admin'),
     supabase.from('attendance').select('staff_id, work_date, status').gte('work_date', start),
     supabase.from('special_class_activities').select('staff_id, created_at').gte('created_at', `${start}T00:00:00`),
   ]);
-  return (users || []).map((user: any) => {
+  return (users || []).filter((user: any) => user.role !== 'admin').map((user: any) => {
     const d = (daily || []).filter((row: any) => row.staff_id === user.id);
     const a = (activities || []).filter((row: any) => row.staff_id === user.id).length;
     const present = new Set(d.filter((row: any) => row.status !== 'absent').map((row: any) => row.work_date)).size;
