@@ -38,7 +38,7 @@ export function Dashboard() {
   async function loadScoreboard() {
     const since = new Date(); since.setDate(since.getDate() - 6); const date = since.toISOString().slice(0, 10);
     const [{ data: profiles }, { data: attendance }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email, status, role').neq('status', 'left'),
+      supabase.from('profiles').select('id, full_name, email, status, role').neq('status', 'left').neq('role', 'admin'),
       supabase.from('attendance').select('staff_id, work_date, status').gte('work_date', date),
     ]);
     const rows = ((profiles || []) as Profile[]).filter((person) => person.role !== 'admin').map((person) => {
