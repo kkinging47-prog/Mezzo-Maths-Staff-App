@@ -125,11 +125,16 @@ begin
     exception when others then
       null;
     end;
-    perform cron.schedule(
-      'mezzo_daily_attendance_deduction_check',
-      '0 18 * * 1-5',
-      $cron_job$select public.create_daily_attendance_deductions(((now() at time zone 'Africa/Accra')::date));$cron_job$
-    );
+
+    begin
+      perform cron.schedule(
+        'mezzo_daily_attendance_deduction_check',
+        '0 18 * * 1-5',
+        $cron_job$select public.create_daily_attendance_deductions(((now() at time zone 'Africa/Accra')::date));$cron_job$
+      );
+    exception when others then
+      raise notice 'Automatic deduction cron could not be scheduled. Use the manual button on /deductions or Supabase Cron UI.';
+    end;
   end if;
 end
 $deduction_cron$;
