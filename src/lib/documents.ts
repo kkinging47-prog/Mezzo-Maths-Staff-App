@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { AppointmentLetterRequest, Payroll, Profile } from '../types';
 import { mezzoLogoDataUrl } from './branding';
+import { getAdminSignatureAsset } from './adminSignature';
 
 const companyName = import.meta.env.VITE_COMPANY_NAME || 'Mezzo House Limited';
 
@@ -53,12 +54,8 @@ function drawAppointmentLetterhead(doc: jsPDF, pageNumber: number) {
   }
 
   if (pageNumber === 1) {
-    try {
-      doc.addImage(mezzoLogoDataUrl, 'JPEG', 20, 16, 28, 28);
-    } catch {
-      doc.setFillColor(17, 24, 39);
-      doc.rect(20, 16, 28, 28, 'F');
-    }
+    try { doc.addImage(mezzoLogoDataUrl, 'JPEG', 20, 16, 28, 28); }
+    catch { doc.setFillColor(17, 24, 39); doc.rect(20, 16, 28, 28, 'F'); }
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(21);
     doc.setTextColor(18, 32, 51);
@@ -67,20 +64,9 @@ function drawAppointmentLetterhead(doc: jsPDF, pageNumber: number) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(0, 82, 153);
-    const contacts = [
-      'Post Office Box 1302',
-      'Kaneshie-North, Accra.',
-      '+233 (0) 303 930 855',
-      '+233 (0) 245 332 495',
-      'mezzooffice@gmail.com',
-      'mezzohouse@yahoo.com',
-    ];
+    const contacts = ['Post Office Box 1302', 'Kaneshie-North, Accra.', '+233 (0) 303 930 855', '+233 (0) 245 332 495', 'mezzooffice@gmail.com', 'mezzohouse@yahoo.com'];
     let y = 20;
-    contacts.forEach((line) => {
-      const textWidth = doc.getTextWidth(line);
-      doc.text(line, pageWidth - 18 - textWidth, y);
-      y += 5;
-    });
+    contacts.forEach((line) => { const textWidth = doc.getTextWidth(line); doc.text(line, pageWidth - 18 - textWidth, y); y += 5; });
   }
 
   doc.setFont('helvetica', 'bold');
@@ -95,12 +81,13 @@ function writeWrapped(doc: jsPDF, text: string, x: number, y: number, maxWidth: 
   return y + lines.length * lineHeight;
 }
 
-export function generateAppointmentLetter(profile: Profile, request: AppointmentLetterRequest) {
+export async function generateAppointmentLetter(profile: Profile, request: AppointmentLetterRequest) {
   if (request.status !== 'approved') {
     throw new Error('This appointment letter must be approved by admin before it can be generated.');
   }
 
   const doc = new jsPDF();
+  const signature = await getAdminSignatureAsset();
   const name = profile.full_name || 'Staff Member';
   const salutation = firstName(profile);
   const position = request.position || profile.position || 'tutor';
@@ -128,10 +115,7 @@ export function generateAppointmentLetter(profile: Profile, request: Appointment
     'Your key responsibilities shall be and not limited to:',
   ];
   paragraphs.forEach((paragraph) => { y = writeWrapped(doc, paragraph, 20, y, 170); y += 3; });
-  ['i. Teaching of Mezzo Maths', 'ii. Giving report when requested', 'iii. Participating in other Mezzo related activities'].forEach((item) => {
-    doc.text(item, 28, y);
-    y += 7;
-  });
+  ['i. Teaching of Mezzo Maths', 'ii. Giving report when requested', 'iii. Participating in other Mezzo related activities'].forEach((item) => { doc.text(item, 28, y); y += 7; });
   y += 4;
 
   const pageOneMore = [
@@ -154,22 +138,22 @@ export function generateAppointmentLetter(profile: Profile, request: Appointment
     'We look forward to a harmonious, fruitful and mutually-beneficial working relationship with you.',
     'You are to indicate in writing, within one week, your acceptance or rejection of the appointment.',
   ];
-  pageTwo.forEach((paragraph, index) => {
-    const x = index >= 1 && index <= 3 ? 32 : 20;
-    const width = index >= 1 && index <= 3 ? 155 : 170;
-    y = writeWrapped(doc, paragraph, x, y, width);
-    y += 5;
-  });
+  pageTwo.forEach((paragraph, index) => { const x = index >= 1 && index <= 3 ? 32 : 20; const width = index >= 1 && index <= 3 ? 155 : 170; y = writeWrapped(doc, paragraph, x, y, width); y += 5; });
 
   y += 8;
   doc.text('Yours faithfully,', 20, y);
-  y += 22;
+  y += 6;
+  if (signature.dataUrl) {
+    try { doc.addImage(signature.dataUrl, signature.format, 20, y, 52, 18, undefined, 'FAST'); y += 22; } catch { y += 18; }
+  } else {
+    y += 16;
+  }
   doc.text('..........................................', 20, y);
   y += 8;
   doc.setFont('helvetica', 'bold');
-  doc.text('Bishop Dr. Peter Osei Akoto', 20, y);
+  doc.text(signature.name || 'Authorized Signatory', 20, y);
   y += 8;
-  doc.text('CEO', 20, y);
+  doc.text('For Mezzo House Ltd.', 20, y);
 
   doc.save(`${fileSafeName(name)}_Appointment_Letter.pdf`);
 }
@@ -207,11 +191,7 @@ export function generateEmploymentLetter(profile: Profile) {
   ];
 
   let y = 75;
-  body.forEach((line) => {
-    const split = doc.splitTextToSize(line, 170);
-    doc.text(split, 20, y);
-    y += split.length * 7;
-  });
+  body.forEach((line) => { const split = doc.splitTextToSize(line, 170); doc.text(split, 20, y); y += split.length * 7; });
 
   doc.save(`${name.replace(/\s+/g, '_')}_Employment_Letter.pdf`);
 }
