@@ -24,6 +24,7 @@ export function Nav() {
         <NavLink to="/queries" className={itemClass}><AlertTriangle size={18}/> Queries</NavLink>
         <NavLink to="/handbook" className={itemClass}><BookOpen size={18}/> Handbook</NavLink>
         <NavLink to="/attendance" className={itemClass}><CalendarCheck size={18}/> Attendance</NavLink>
+        <NavLink to="/deductions" className={itemClass}><AlertTriangle size={18}/> Deductions</NavLink>
         <NavLink to="/profile" className={itemClass}><UserCog size={18}/> My Details</NavLink>
         <NavLink to="/reports" className={itemClass}><FileText size={18}/> Weekly Report</NavLink>
         <NavLink to="/timetable" className={itemClass}><Clock3 size={18}/> Timetable</NavLink>
