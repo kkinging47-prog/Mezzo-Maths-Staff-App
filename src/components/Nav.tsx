@@ -23,7 +23,7 @@ export function Nav() {
         <NavLink to="/messages" className={itemClass}><Mail size={18}/> Inbox</NavLink>
         <NavLink to="/queries" className={itemClass}><AlertTriangle size={18}/> Queries</NavLink>
         <NavLink to="/handbook" className={itemClass}><BookOpen size={18}/> Handbook</NavLink>
-        <NavLink to="/attendance" className={itemClass}><CalendarCheck size={18}/> Attendance</NavLink>
+        {!isAdmin && <NavLink to="/attendance" className={itemClass}><CalendarCheck size={18}/> Attendance</NavLink>}
         <NavLink to="/deductions" className={itemClass}><AlertTriangle size={18}/> Deductions</NavLink>
         <NavLink to="/profile" className={itemClass}><UserCog size={18}/> My Details</NavLink>
         <NavLink to="/reports" className={itemClass}><FileText size={18}/> Weekly Report</NavLink>
