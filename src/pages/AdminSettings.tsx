@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 import { downloadCsv, compressImage } from '../lib/images';
 import { supabase } from '../lib/supabase';
 import { CompanyLogo } from '../components/CompanyLogo';
+import { fileToDataUrl } from '../lib/adminSignature';
 
 const terms = ['Term 1','Term 2','Term 3'];
 
@@ -14,28 +15,177 @@ export function AdminSettings() {
   const [logoUrl, setLogoUrl] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState('');
+  const [signatureUrl, setSignatureUrl] = useState('');
+  const [signatureName, setSignatureName] = useState('Authorized Signatory');
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [signatureDataUrl, setSignatureDataUrl] = useState('');
+  const [signaturePreview, setSignaturePreview] = useState('');
   const [posts, setPosts] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const [message, setMessage] = useState('');
   const [logoBusy, setLogoBusy] = useState(false);
+  const [signatureBusy, setSignatureBusy] = useState(false);
 
   async function load() {
     const [{ data: settings }, { data: postData }, { data: activityData }] = await Promise.all([
-      supabase.from('company_settings').select('key,value').in('key', ['salary_pay_date','company_logo_url','current_academic_year','current_term']),
+      supabase.from('company_settings').select('key,value').in('key', ['salary_pay_date','company_logo_url','current_academic_year','current_term','admin_signature_url','admin_signature_name','admin_signature_data_url']),
       supabase.from('company_posts').select('id,title,priority,created_at,image_url,archived_at').is('archived_at', null).order('created_at', { ascending: false }).limit(100),
       supabase.from('special_class_activities').select('id,title,photo_urls,created_at, schools(name), profiles(full_name,email)').order('created_at', { ascending: false }).limit(300),
     ]);
     const cfg = Object.fromEntries((settings || []).map((row: any) => [row.key, row.value]));
-    setSalaryDate(cfg.salary_pay_date || ''); setLogoUrl(cfg.company_logo_url || ''); setLogoPreview(cfg.company_logo_url || ''); setAcademicYear(cfg.current_academic_year || '2026/2027'); setCurrentTerm(cfg.current_term || 'Term 1');
-    setPosts(postData || []); setActivities(activityData || []);
+    setSalaryDate(cfg.salary_pay_date || '');
+    setLogoUrl(cfg.company_logo_url || '');
+    setLogoPreview(cfg.company_logo_url || '');
+    setAcademicYear(cfg.current_academic_year || '2026/2027');
+    setCurrentTerm(cfg.current_term || 'Term 1');
+    setSignatureUrl(cfg.admin_signature_url || '');
+    setSignatureName(cfg.admin_signature_name || 'Authorized Signatory');
+    setSignatureDataUrl(cfg.admin_signature_data_url || '');
+    setSignaturePreview(cfg.admin_signature_data_url || cfg.admin_signature_url || '');
+    setPosts(postData || []);
+    setActivities(activityData || []);
   }
+
   useEffect(() => { load(); }, []);
-  async function saveSalaryDate(event: FormEvent) { event.preventDefault(); if (!profile) return; const { error } = await supabase.from('company_settings').upsert({ key: 'salary_pay_date', value: salaryDate, updated_by: profile.id, updated_at: new Date().toISOString() }); if (error) setMessage(error.message); else { await supabase.from('company_posts').insert({ author_id: profile.id, title: 'Salary Payment Date', body: `Salaries are scheduled to be paid on ${new Date(salaryDate).toLocaleDateString()}.`, priority: 'important', post_type: 'update' }); setMessage('Salary pay date saved and posted to dashboard.'); load(); } }
-  async function saveAcademicSettings(event: FormEvent) { event.preventDefault(); if (!profile) return; const { error } = await supabase.from('company_settings').upsert([{ key: 'current_academic_year', value: academicYear, updated_by: profile.id, updated_at: new Date().toISOString() }, { key: 'current_term', value: currentTerm, updated_by: profile.id, updated_at: new Date().toISOString() }]); if (error) setMessage(error.message); else { setMessage('Academic year and term saved.'); load(); } }
-  async function selectLogo(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; const compressed = await compressImage(file, 700, 0.86); setLogoFile(compressed); setLogoPreview(URL.createObjectURL(compressed)); }
-  async function uploadLogo(event: FormEvent) { event.preventDefault(); if (!profile || !logoFile) { setMessage('Please select a logo image first.'); return; } setLogoBusy(true); try { const path = `logos/mezzo-logo-${Date.now()}.jpg`; const { error: uploadError } = await supabase.storage.from('company-assets').upload(path, logoFile, { contentType: 'image/jpeg', upsert: true }); if (uploadError) throw uploadError; const { data } = supabase.storage.from('company-assets').getPublicUrl(path); const publicUrl = data.publicUrl; const { error } = await supabase.from('company_settings').upsert({ key: 'company_logo_url', value: publicUrl, updated_by: profile.id, updated_at: new Date().toISOString() }); if (error) throw error; const refreshed = `${publicUrl}?v=${Date.now()}`; localStorage.setItem('mezzo_company_logo_url', refreshed); setLogoUrl(publicUrl); setLogoPreview(refreshed); setLogoFile(null); setMessage('Company logo uploaded. Refresh the login page if it is already open.'); } catch (error: any) { setMessage(error.message || 'Logo upload failed.'); } finally { setLogoBusy(false); } }
-  async function archivePost(id: string) { const { error } = await supabase.from('company_posts').update({ archived_at: new Date().toISOString() }).eq('id', id); if (error) setMessage(error.message); else { setMessage('Dashboard update archived.'); load(); } }
-  function exportImages() { const rows: any[] = []; posts.forEach((p) => { if (p.image_url) rows.push({ source: 'dashboard_post', title: p.title, image_url: p.image_url, created_at: p.created_at }); }); activities.forEach((a) => (a.photo_urls || []).forEach((url: string, i: number) => rows.push({ source: 'special_activity', title: a.title, school: a.schools?.name, staff: a.profiles?.full_name || a.profiles?.email, image_url: url, photo_number: i + 1, created_at: a.created_at }))); if (logoUrl) rows.push({ source: 'company_logo', title: 'Company Logo', image_url: logoUrl, created_at: '' }); downloadCsv('staff-portal-image-manifest.csv', rows); }
+
+  async function saveSalaryDate(event: FormEvent) {
+    event.preventDefault();
+    if (!profile) return;
+    const { error } = await supabase.from('company_settings').upsert({ key: 'salary_pay_date', value: salaryDate, updated_by: profile.id, updated_at: new Date().toISOString() });
+    if (error) setMessage(error.message); else {
+      await supabase.from('company_posts').insert({ author_id: profile.id, title: 'Salary Payment Date', body: `Salaries are scheduled to be paid on ${new Date(salaryDate).toLocaleDateString()}.`, priority: 'important', post_type: 'update' });
+      setMessage('Salary pay date saved and posted to dashboard.');
+      load();
+    }
+  }
+
+  async function saveAcademicSettings(event: FormEvent) {
+    event.preventDefault();
+    if (!profile) return;
+    const { error } = await supabase.from('company_settings').upsert([
+      { key: 'current_academic_year', value: academicYear, updated_by: profile.id, updated_at: new Date().toISOString() },
+      { key: 'current_term', value: currentTerm, updated_by: profile.id, updated_at: new Date().toISOString() },
+    ]);
+    if (error) setMessage(error.message); else { setMessage('Academic year and term saved.'); load(); }
+  }
+
+  async function selectLogo(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const compressed = await compressImage(file, 700, 0.86);
+    setLogoFile(compressed);
+    setLogoPreview(URL.createObjectURL(compressed));
+  }
+
+  async function uploadLogo(event: FormEvent) {
+    event.preventDefault();
+    if (!profile || !logoFile) { setMessage('Please select a logo image first.'); return; }
+    setLogoBusy(true);
+    try {
+      const path = `logos/mezzo-logo-${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage.from('company-assets').upload(path, logoFile, { contentType: 'image/jpeg', upsert: true });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from('company-assets').getPublicUrl(path);
+      const publicUrl = data.publicUrl;
+      const { error } = await supabase.from('company_settings').upsert({ key: 'company_logo_url', value: publicUrl, updated_by: profile.id, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      const refreshed = `${publicUrl}?v=${Date.now()}`;
+      localStorage.setItem('mezzo_company_logo_url', refreshed);
+      setLogoUrl(publicUrl);
+      setLogoPreview(refreshed);
+      setLogoFile(null);
+      setMessage('Company logo uploaded. Refresh the login page if it is already open.');
+    } catch (error: any) {
+      setMessage(error.message || 'Logo upload failed.');
+    } finally { setLogoBusy(false); }
+  }
+
+  async function selectSignature(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const compressed = await compressImage(file, 900, 0.9);
+    const dataUrl = await fileToDataUrl(compressed);
+    setSignatureFile(compressed);
+    setSignatureDataUrl(dataUrl);
+    setSignaturePreview(dataUrl);
+  }
+
+  async function uploadSignature(event: FormEvent) {
+    event.preventDefault();
+    if (!profile) return;
+    if (!signatureName.trim()) { setMessage('Please enter the authorized signatory name.'); return; }
+    if (!signatureFile && !signatureDataUrl && !signatureUrl) { setMessage('Please select a signature image first.'); return; }
+    setSignatureBusy(true);
+    try {
+      let publicUrl = signatureUrl;
+      let dataUrl = signatureDataUrl;
+      if (signatureFile) {
+        const path = `signatures/admin-signature-${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage.from('company-assets').upload(path, signatureFile, { contentType: 'image/jpeg', upsert: true });
+        if (uploadError) throw uploadError;
+        const { data } = supabase.storage.from('company-assets').getPublicUrl(path);
+        publicUrl = data.publicUrl;
+        if (!dataUrl) dataUrl = await fileToDataUrl(signatureFile);
+      }
+      const { error } = await supabase.from('company_settings').upsert([
+        { key: 'admin_signature_name', value: signatureName.trim(), updated_by: profile.id, updated_at: new Date().toISOString() },
+        { key: 'admin_signature_url', value: publicUrl, updated_by: profile.id, updated_at: new Date().toISOString() },
+        { key: 'admin_signature_data_url', value: dataUrl, updated_by: profile.id, updated_at: new Date().toISOString() },
+      ]);
+      if (error) throw error;
+      setSignatureUrl(publicUrl);
+      setSignatureDataUrl(dataUrl);
+      setSignaturePreview(dataUrl || publicUrl);
+      setSignatureFile(null);
+      localStorage.setItem('mezzo_admin_signature_data_url', dataUrl || '');
+      setMessage('Admin signature saved. It will now appear on generated appointment letters and binding agreements.');
+    } catch (error: any) {
+      setMessage(error.message || 'Signature upload failed.');
+    } finally { setSignatureBusy(false); }
+  }
+
+  async function archivePost(id: string) {
+    const { error } = await supabase.from('company_posts').update({ archived_at: new Date().toISOString() }).eq('id', id);
+    if (error) setMessage(error.message); else { setMessage('Dashboard update archived.'); load(); }
+  }
+
+  function exportImages() {
+    const rows: any[] = [];
+    posts.forEach((p) => { if (p.image_url) rows.push({ source: 'dashboard_post', title: p.title, image_url: p.image_url, created_at: p.created_at }); });
+    activities.forEach((a) => (a.photo_urls || []).forEach((url: string, i: number) => rows.push({ source: 'special_activity', title: a.title, school: a.schools?.name, staff: a.profiles?.full_name || a.profiles?.email, image_url: url, photo_number: i + 1, created_at: a.created_at })));
+    if (logoUrl) rows.push({ source: 'company_logo', title: 'Company Logo', image_url: logoUrl, created_at: '' });
+    if (signatureUrl) rows.push({ source: 'admin_signature', title: signatureName || 'Admin Signature', image_url: signatureUrl, created_at: '' });
+    downloadCsv('staff-portal-image-manifest.csv', rows);
+  }
+
   if (profile?.role !== 'admin') return <div className="empty">This page is for admin only.</div>;
-  return <section><div className="page-header"><div><h1>Admin Settings</h1><p>Salary date, academic term, logo upload, dashboard archives and image export manifest.</p></div><button className="primary" onClick={exportImages}>Export Image Manifest CSV</button></div>{message && <div className="status info">{message}</div>}<div className="grid two"><form className="panel form-grid" onSubmit={saveAcademicSettings}><h2>Academic Year & Term</h2><label>Academic Year<input value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} required /></label><label>Current Term<select value={currentTerm} onChange={(e) => setCurrentTerm(e.target.value)}>{terms.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><button className="primary">Save Academic Settings</button></form><form className="panel form-grid" onSubmit={saveSalaryDate}><h2>Salary Payment Date</h2><label>Payment Date<input type="date" value={salaryDate} onChange={(e) => setSalaryDate(e.target.value)} required /></label><button className="primary">Save and Notify Staff</button></form><form className="panel form-grid" onSubmit={uploadLogo}><h2>Company Logo</h2><div className="profile-photo-row"><div className="profile-photo-preview logo-preview">{logoPreview ? <img src={logoPreview} alt="Uploaded company logo preview" /> : <CompanyLogo className="login-logo" />}</div><div><label>Upload Mezzo Maths Logo<input type="file" accept="image/*" onChange={selectLogo} /></label><p className="hint">Upload the logo once here. It will be compressed and used on the welcome login page and sidebar.</p></div></div><button className="primary" disabled={logoBusy}>{logoBusy ? 'Uploading logo...' : 'Save Company Logo'}</button></form></div><div className="panel"><h2>Archive Dashboard Updates</h2><p className="hint">Dashboard posts remain visible until archived here.</p><div className="table-card compact-table"><table><thead><tr><th>Title</th><th>Priority</th><th>Posted</th><th>Action</th></tr></thead><tbody>{posts.map((post) => <tr key={post.id}><td>{post.title}</td><td>{post.priority}</td><td>{new Date(post.created_at).toLocaleString()}</td><td><button className="danger small-button" onClick={() => archivePost(post.id)}>Archive</button></td></tr>)}</tbody></table></div></div></section>;
+
+  return <section>
+    <div className="page-header"><div><h1>Admin Settings</h1><p>Salary date, academic term, logo, admin signature, dashboard archives and image export manifest.</p></div><button className="primary" onClick={exportImages}>Export Image Manifest CSV</button></div>
+    {message && <div className="status info">{message}</div>}
+    <div className="grid two">
+      <form className="panel form-grid" onSubmit={saveAcademicSettings}>
+        <h2>Academic Year & Term</h2>
+        <label>Academic Year<input value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} required /></label>
+        <label>Current Term<select value={currentTerm} onChange={(e) => setCurrentTerm(e.target.value)}>{terms.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+        <button className="primary">Save Academic Settings</button>
+      </form>
+      <form className="panel form-grid" onSubmit={saveSalaryDate}>
+        <h2>Salary Payment Date</h2>
+        <label>Payment Date<input type="date" value={salaryDate} onChange={(e) => setSalaryDate(e.target.value)} required /></label>
+        <button className="primary">Save and Notify Staff</button>
+      </form>
+      <form className="panel form-grid" onSubmit={uploadLogo}>
+        <h2>Company Logo</h2>
+        <div className="profile-photo-row"><div className="profile-photo-preview logo-preview">{logoPreview ? <img src={logoPreview} alt="Uploaded company logo preview" /> : <CompanyLogo className="login-logo" />}</div><div><label>Upload Mezzo Maths Logo<input type="file" accept="image/*" onChange={selectLogo} /></label><p className="hint">Upload the logo once here. It will be compressed and used on the welcome login page and sidebar.</p></div></div>
+        <button className="primary" disabled={logoBusy}>{logoBusy ? 'Uploading logo...' : 'Save Company Logo'}</button>
+      </form>
+      <form className="panel form-grid" onSubmit={uploadSignature}>
+        <h2>Admin Signature for Documents</h2>
+        <div className="profile-photo-row"><div className="profile-photo-preview signature-preview">{signaturePreview ? <img src={signaturePreview} alt="Admin signature preview" /> : <span>No signature</span>}</div><div><label>Authorized Signatory Name<input value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder="Example: Bishop Dr. Peter Osei Akoto" /></label><label>Upload Signature Image<input type="file" accept="image/*" onChange={selectSignature} /></label><p className="hint">Use a clear scanned signature on a white background. It will be used on generated appointment letters and binding agreements.</p></div></div>
+        <button className="primary" disabled={signatureBusy}>{signatureBusy ? 'Saving signature...' : 'Save Admin Signature'}</button>
+      </form>
+    </div>
+    <div className="panel"><h2>Archive Dashboard Updates</h2><p className="hint">Dashboard posts remain visible until archived here.</p><div className="table-card compact-table"><table><thead><tr><th>Title</th><th>Priority</th><th>Posted</th><th>Action</th></tr></thead><tbody>{posts.map((post) => <tr key={post.id}><td>{post.title}</td><td>{post.priority}</td><td>{new Date(post.created_at).toLocaleString()}</td><td><button className="danger small-button" onClick={() => archivePost(post.id)}>Archive</button></td></tr>)}</tbody></table></div></div>
+  </section>;
 }
