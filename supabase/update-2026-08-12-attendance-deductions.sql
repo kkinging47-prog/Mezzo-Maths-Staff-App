@@ -111,7 +111,7 @@ grant execute on function public.create_daily_attendance_deductions(date) to aut
 
 -- Optional automatic daily check using Supabase Cron/pg_cron.
 -- If pg_cron is not enabled in your Supabase project, the manual button on /deductions still works.
-do $$
+do $deduction_cron$
 begin
   begin
     create extension if not exists pg_cron with schema extensions;
@@ -128,7 +128,8 @@ begin
     perform cron.schedule(
       'mezzo_daily_attendance_deduction_check',
       '0 18 * * 1-5',
-      $$select public.create_daily_attendance_deductions(((now() at time zone 'Africa/Accra')::date));$$
+      $cron_job$select public.create_daily_attendance_deductions(((now() at time zone 'Africa/Accra')::date));$cron_job$
     );
   end if;
-end $$;
+end
+$deduction_cron$;
