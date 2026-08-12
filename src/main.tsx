@@ -18,6 +18,7 @@ import { Messages } from './pages/Messages';
 import { Queries } from './pages/Queries';
 import { Handbook } from './pages/Handbook';
 import { Deductions } from './pages/Deductions';
+import { Loans } from './pages/Loans';
 import { WorkbookOrders } from './pages/WorkbookOrders';
 import { ReportSummary } from './pages/ReportSummary';
 import { AdminDocuments } from './pages/AdminDocuments';
@@ -44,6 +45,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/queries" element={<Queries />} />
             <Route path="/handbook" element={<Handbook />} />
             <Route path="/deductions" element={<Deductions />} />
+            <Route path="/loans" element={<Loans />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/meetings" element={<Meetings />} />
             <Route path="/workbooks" element={<WorkbookOrders />} />
