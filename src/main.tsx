@@ -4,6 +4,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/auth';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
+import { AppInstallPrompt } from './components/AppInstallPrompt';
+import { RealtimeNotifications } from './components/RealtimeNotifications';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Attendance } from './pages/Attendance';
@@ -31,6 +33,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
+        <AppInstallPrompt />
+        <RealtimeNotifications />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
