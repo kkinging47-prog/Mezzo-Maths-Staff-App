@@ -1,6 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="42" fill="#1d4ed8"/>
-  <circle cx="96" cy="96" r="64" fill="#ffffff" opacity="0.96"/>
-  <path d="M50 112c18-38 40-56 66-56 18 0 30 8 30 22 0 17-16 25-35 25H92l-11 27H52l18-44h42c8 0 13-3 13-8s-5-8-13-8c-20 0-35 15-47 42H50Z" fill="#1d4ed8"/>
-  <path d="M109 130h31l10-24h-31l-10 24Z" fill="#f59e0b"/>
+  <defs>
+    <linearGradient id="bg" x1="28" y1="12" x2="170" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1d6cff"/>
+      <stop offset="1" stop-color="#06245f"/>
+    </linearGradient>
+    <linearGradient id="person" x1="66" y1="44" x2="128" y2="142" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1d6cff"/>
+      <stop offset="1" stop-color="#06245f"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="#f8fbff"/>
+  <circle cx="96" cy="96" r="80" fill="#ffffff"/>
+  <path d="M38 116c-9-38 12-78 49-90 32-10 67 2 86 30" fill="none" stroke="url(#bg)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M170 75c14 42-9 88-52 102-35 11-72-3-91-33" fill="none" stroke="url(#bg)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M35 51h14M42 44v14" stroke="#1d6cff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M86 30h20M86 40h20" stroke="#1d6cff" stroke-width="7" stroke-linecap="round"/>
+  <text x="141" y="58" fill="#1d6cff" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="800">π</text>
+  <circle cx="96" cy="69" r="26" fill="url(#person)"/>
+  <circle cx="57" cy="90" r="19" fill="#1d6cff"/>
+  <circle cx="135" cy="90" r="19" fill="#1d6cff"/>
+  <path d="M46 146v-30c0-16 13-29 29-29h42c16 0 29 13 29 29v30c-14 12-31 19-50 19s-36-7-50-19Z" fill="url(#person)"/>
+  <path d="M58 147v-25c0-10 5-19 13-25-18 0-32 14-32 32v8c5 4 11 7 19 10Z" fill="#1d6cff" opacity="0.88"/>
+  <path d="M134 147v-25c0-10-5-19-13-25 18 0 32 14 32 32v8c-5 4-11 7-19 10Z" fill="#1d6cff" opacity="0.88"/>
+  <path d="M77 95l19 28 19-28" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="80" y="115" width="32" height="38" rx="5" fill="#ffffff"/>
+  <text x="96" y="140" fill="#1d4ed8" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="900" text-anchor="middle">M²</text>
 </svg>
