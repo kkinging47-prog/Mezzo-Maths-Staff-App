@@ -75,10 +75,14 @@ export function ProfilePage() {
         photo_url: photoUrl,
         updated_at: new Date().toISOString(),
       };
-      const { error } = await supabase.from('profiles').update(payload).eq('id', profile.id).select('id').single();
+      const { data: savedProfile, error } = await supabase.from('profiles').update(payload).eq('id', profile.id).select('*').single();
       if (error) throw error;
+      if (savedProfile) {
+        setForm(savedProfile as Profile);
+        setPhotoPreview(savedProfile.photo_url || '');
+      }
       setType('success');
-      setMessage(`Staff details saved successfully.${emailNotice}`);
+      setMessage(`Staff details saved and confirmed. Log out and log in again to see the same saved details.${emailNotice}`);
       setPhotoFile(null);
       await refreshProfile();
     } catch (error: any) {
