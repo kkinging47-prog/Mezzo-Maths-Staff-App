@@ -13,6 +13,10 @@ function currentMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
+function staffName(row: any) {
+  return row.staff?.full_name || row.staff?.email || '-';
+}
+
 export function CreditUnion() {
   const { profile } = useAuth();
   const [staff, setStaff] = useState<Profile[]>([]);
@@ -24,17 +28,18 @@ export function CreditUnion() {
 
   async function load() {
     if (!profile) return;
+    const staffRelation = 'staff:profiles!credit_union_contributions_staff_id_fkey(full_name,email,position)';
     if (isAdmin) {
       const [{ data: staffRows }, { data: contributionRows, error }] = await Promise.all([
         supabase.from('profiles').select('*').neq('status', 'left').order('full_name'),
-        supabase.from('credit_union_contributions').select('*, profiles(full_name,email,position)').order('contribution_month', { ascending: false }).order('created_at', { ascending: false }).limit(500),
+        supabase.from('credit_union_contributions').select(`*, ${staffRelation}`).order('contribution_month', { ascending: false }).order('created_at', { ascending: false }).limit(500),
       ]);
       const staffList = (staffRows || []) as Profile[];
       setStaff(staffList);
       if (!form.staff_id && staffList[0]) setForm((prev) => ({ ...prev, staff_id: staffList[0].id }));
       if (error) setMessage(error.message); else setRecords(contributionRows || []);
     } else {
-      const { data, error } = await supabase.from('credit_union_contributions').select('*, profiles(full_name,email,position)').eq('staff_id', profile.id).order('contribution_month', { ascending: false }).limit(200);
+      const { data, error } = await supabase.from('credit_union_contributions').select(`*, ${staffRelation}`).eq('staff_id', profile.id).order('contribution_month', { ascending: false }).limit(200);
       if (error) setMessage(error.message); else setRecords(data || []);
     }
   }
@@ -75,8 +80,8 @@ export function CreditUnion() {
 
   function exportCsv() {
     downloadCsv('credit-union-contributions.csv', records.map((row) => ({
-      staff: row.profiles?.full_name || row.profiles?.email,
-      position: row.profiles?.position,
+      staff: staffName(row),
+      position: row.staff?.position,
       month: row.contribution_month,
       amount: row.amount,
       type: row.contribution_type,
@@ -113,7 +118,7 @@ export function CreditUnion() {
 
     <div className="panel">
       <h2>{isAdmin ? 'All Contributions' : 'My Contributions'}</h2>
-      <div className="table-card"><table><thead><tr><th>Month</th><th>Staff</th><th>Amount</th><th>Type</th><th>Notes</th>{isAdmin && <th>Action</th>}</tr></thead><tbody>{records.map((row) => <tr key={row.id}><td>{row.contribution_month}</td><td>{row.profiles?.full_name || row.profiles?.email || '-'}</td><td>{money(row.amount)}</td><td><span className="pill">{row.contribution_type}</span></td><td>{row.notes || '-'}</td>{isAdmin && <td><button className="danger small-button" disabled={busy} onClick={() => deleteContribution(row.id)}>Delete</button></td>}</tr>)}</tbody></table></div>
+      <div className="table-card"><table><thead><tr><th>Month</th><th>Staff</th><th>Amount</th><th>Type</th><th>Notes</th>{isAdmin && <th>Action</th>}</tr></thead><tbody>{records.map((row) => <tr key={row.id}><td>{row.contribution_month}</td><td>{staffName(row)}</td><td>{money(row.amount)}</td><td><span className="pill">{row.contribution_type}</span></td><td>{row.notes || '-'}</td>{isAdmin && <td><button className="danger small-button" disabled={busy} onClick={() => deleteContribution(row.id)}>Delete</button></td>}</tr>)}</tbody></table></div>
       {records.length === 0 && <div className="empty">No credit union contribution records found.</div>}
     </div>
   </section>;
