@@ -4,7 +4,7 @@ import { downloadCsv } from '../lib/images';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 
-const SHARE_VALUE = 200;
+const SHARE_VALUE = 20;
 
 function money(value: number | string | null | undefined) {
   return `GHS ${Number(value || 0).toFixed(2)}`;
@@ -117,7 +117,7 @@ export function CreditUnion() {
   const monthTotal = records.filter((row) => row.contribution_month === thisMonth).reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
   return <section>
-    <div className="page-header"><div><h1>Credit Union Contributions</h1><p>Each credit union share is GHS 200. Record old contributions and current monthly contributions.</p></div>{isAdmin && <button className="primary" onClick={exportCsv}>Download CSV</button>}</div>
+    <div className="page-header"><div><h1>Credit Union Contributions</h1><p>Each credit union share is GHS 20. Record old contributions and current monthly contributions.</p></div>{isAdmin && <button className="primary" onClick={exportCsv}>Download CSV</button>}</div>
     {message && <div className="status info">{message}</div>}
     <div className="grid four">
       <div className="metric-card"><span>{isAdmin ? 'Total Contributions' : 'My Total Contributions'}</span><strong>{money(total)}</strong></div>
@@ -128,14 +128,14 @@ export function CreditUnion() {
 
     {isAdmin && <form className="panel form-grid" onSubmit={addContribution}>
       <h2>Add Contribution</h2>
-      <p className="hint">Enter old records year by year or month by month. The system multiplies shares by GHS 200 for the contribution amount, and multiplies dividend amount by number of shares.</p>
+      <p className="hint">Enter old records year by year or month by month. The system multiplies shares by GHS 20 for the contribution amount, and multiplies dividend amount by number of shares.</p>
       <div className="grid two">
         <label>Staff<select value={form.staff_id} onChange={(e) => setForm({ ...form, staff_id: e.target.value })}>{staff.map((person) => <option key={person.id} value={person.id}>{person.full_name || person.email}</option>)}</select></label>
         <label>Contribution Month / Date<input type="date" value={form.contribution_month} onChange={(e) => setForm({ ...form, contribution_month: e.target.value })} required /></label>
         <label>Number of Shares<input type="number" min="0" step="0.01" value={form.number_of_shares} onChange={(e) => setForm({ ...form, number_of_shares: e.target.value })} placeholder="Example: 5" required /></label>
-        <label>Share Value<input value="GHS 200.00" disabled /></label>
+        <label>Share Value<input value="GHS 20.00" disabled /></label>
         <label>Contribution Amount<input value={money(calculated.amount)} disabled /></label>
-        <label>Dividend Amount Per Share<input type="number" min="0" step="0.01" value={form.dividend_per_share} onChange={(e) => setForm({ ...form, dividend_per_share: e.target.value })} placeholder="Example: 20" /></label>
+        <label>Dividend Amount Per Share<input type="number" min="0" step="0.01" value={form.dividend_per_share} onChange={(e) => setForm({ ...form, dividend_per_share: e.target.value })} placeholder="Example: 2" /></label>
         <label>Total Dividend<input value={money(calculated.dividendAmount)} disabled /></label>
         <label>Type<select value={form.contribution_type} onChange={(e) => setForm({ ...form, contribution_type: e.target.value })}><option value="monthly">Monthly Contribution</option><option value="old_record">Old / Past Years Record</option><option value="top_up">Top Up</option><option value="adjustment">Adjustment</option></select></label>
       </div>
