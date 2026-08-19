@@ -21,21 +21,11 @@ export function ProfilePage() {
   const [busy, setBusy] = useState(false);
   const [passwordBusy, setPasswordBusy] = useState(false);
 
-  useEffect(() => {
-    if (profile) {
-      setForm(profile);
-      setPhotoPreview(profile.photo_url || '');
-    }
-  }, [profile]);
+  useEffect(() => { if (profile) { setForm(profile); setPhotoPreview(profile.photo_url || ''); } }, [profile]);
 
-  const age = useMemo(() => {
-    if (!form.date_of_birth) return '';
-    return differenceInYears(new Date(), new Date(form.date_of_birth));
-  }, [form.date_of_birth]);
+  const age = useMemo(() => { if (!form.date_of_birth) return ''; return differenceInYears(new Date(), new Date(form.date_of_birth)); }, [form.date_of_birth]);
 
-  function setField(key: keyof Profile, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
+  function setField(key: keyof Profile, value: string) { setForm((prev) => ({ ...prev, [key]: value })); }
 
   async function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -49,7 +39,7 @@ export function ProfilePage() {
     if (!photoFile || !profile) return form.photo_url || null;
     const path = `${profile.id}/profile-${Date.now()}.jpg`;
     const { error } = await supabase.storage.from('profile-photos').upload(path, photoFile, { upsert: true, contentType: 'image/jpeg' });
-    if (error) throw error;
+    if (error) throw new Error(`Profile photo upload failed: ${error.message}`);
     const { data } = supabase.storage.from('profile-photos').getPublicUrl(path);
     return data.publicUrl;
   }
@@ -57,44 +47,44 @@ export function ProfilePage() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!profile) return;
-    setBusy(true);
-    setMessage('');
+    setBusy(true); setMessage('');
     try {
       const nextEmail = String(form.email || '').trim().toLowerCase();
       if (!nextEmail) throw new Error('Email is required.');
+      let savedEmail = profile.email;
+      let emailNotice = '';
       if (nextEmail !== profile.email) {
         const { error: emailError } = await supabase.auth.updateUser({ email: nextEmail });
-        if (emailError) throw emailError;
+        if (emailError) emailNotice = ` Other details were saved, but email was not changed: ${emailError.message}`;
+        else { savedEmail = nextEmail; emailNotice = ' Check your new email inbox if confirmation is requested before using it to sign in.'; }
       }
       const photoUrl = await uploadProfilePhoto();
       const payload = {
-        full_name: form.full_name,
-        email: nextEmail,
+        full_name: form.full_name || null,
+        email: savedEmail,
         date_of_birth: form.date_of_birth || null,
         date_employed: form.date_employed || null,
-        phone: form.phone,
-        location: form.location,
-        digital_address: form.digital_address,
-        home_address: form.home_address,
-        guardian_name: form.guardian_name,
-        guardian_contact: form.guardian_contact,
-        position: form.position,
-        department: form.department,
+        phone: form.phone || null,
+        location: form.location || null,
+        digital_address: form.digital_address || null,
+        home_address: form.home_address || null,
+        guardian_name: form.guardian_name || null,
+        guardian_contact: form.guardian_contact || null,
+        position: form.position || profile.position || 'Tutor',
+        department: form.department || profile.department || 'Teaching',
         photo_url: photoUrl,
         updated_at: new Date().toISOString(),
       };
-      const { error } = await supabase.from('profiles').update(payload).eq('id', profile.id);
+      const { error } = await supabase.from('profiles').update(payload).eq('id', profile.id).select('id').single();
       if (error) throw error;
       setType('success');
-      setMessage(nextEmail !== profile.email ? 'Details saved. Check your new email inbox if confirmation is requested before using it to sign in.' : 'Your information and profile photo have been updated successfully.');
+      setMessage(`Staff details saved successfully.${emailNotice}`);
       setPhotoFile(null);
       await refreshProfile();
     } catch (error: any) {
       setType('error');
-      setMessage(error.message || 'Could not save your details.');
-    } finally {
-      setBusy(false);
-    }
+      setMessage(error.message || 'Could not save your details. Ask admin to run the profile-save SQL fix.');
+    } finally { setBusy(false); }
   }
 
   async function updatePassword(event: FormEvent) {
@@ -106,15 +96,8 @@ export function ProfilePage() {
     try {
       const { error } = await supabase.auth.updateUser({ password: passwordForm.newPassword });
       if (error) throw error;
-      setType('success');
-      setMessage('Your password has been updated successfully. Use the new password next time you sign in.');
-      setPasswordForm({ newPassword: '', confirmPassword: '' });
-    } catch (error: any) {
-      setType('error');
-      setMessage(error.message || 'Could not update your password.');
-    } finally {
-      setPasswordBusy(false);
-    }
+      setType('success'); setMessage('Your password has been updated successfully. Use the new password next time you sign in.'); setPasswordForm({ newPassword: '', confirmPassword: '' });
+    } catch (error: any) { setType('error'); setMessage(error.message || 'Could not update your password.'); } finally { setPasswordBusy(false); }
   }
 
   return <section>
@@ -143,10 +126,7 @@ export function ProfilePage() {
     <form className="panel form-grid" onSubmit={updatePassword}>
       <h2>Update Password</h2>
       <p className="hint">After admin gives you an initial or temporary password, you can change it here.</p>
-      <div className="grid two">
-        <label>New Password<PasswordInput value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
-        <label>Confirm New Password<PasswordInput value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} required minLength={6} autoComplete="new-password" /></label>
-      </div>
+      <div className="grid two"><label>New Password<PasswordInput value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} required minLength={6} autoComplete="new-password" /></label><label>Confirm New Password<PasswordInput value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} required minLength={6} autoComplete="new-password" /></label></div>
       <button className="primary" disabled={passwordBusy}>{passwordBusy ? 'Updating password...' : 'Update password'}</button>
     </form>
   </section>;
