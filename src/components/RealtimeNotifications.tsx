@@ -15,6 +15,11 @@ async function notify(title: string, body: string, url = '/dashboard') {
   else new Notification(title, options);
 }
 
+function meetingBody(row: any) {
+  const when = row?.scheduled_at ? new Date(row.scheduled_at).toLocaleString() : 'Open meeting';
+  return `${row?.title || 'A company meeting has been posted.'} · ${when}`;
+}
+
 export function RealtimeNotifications() {
   const { profile } = useAuth();
   const [permission, setPermission] = useState<NotificationPermission>(() => ('Notification' in window ? Notification.permission : 'denied'));
@@ -47,6 +52,15 @@ export function RealtimeNotifications() {
       notify('New dashboard update', payload.new?.title || 'A new update has been posted.', '/dashboard');
     });
 
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'meetings' }, (payload: any) => {
+      notify('New meeting update', meetingBody(payload.new), '/meetings');
+    });
+
+    channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'meetings' }, (payload: any) => {
+      if (payload.new?.active === false) return;
+      notify('Meeting updated', meetingBody(payload.new), '/meetings');
+    });
+
     channel.subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [profile?.id, isAdmin, supervisor]);
@@ -61,7 +75,7 @@ export function RealtimeNotifications() {
   if (permission === 'denied') return null;
 
   return <div className="install-prompt notification-prompt">
-    <div><strong>Enable real-time notifications</strong><span>Get alerts for inbox messages, queries and deduction notices.</span></div>
+    <div><strong>Enable real-time notifications</strong><span>Get alerts for inbox messages, queries, deductions, meetings and dashboard updates.</span></div>
     <button className="primary small-button" onClick={enable}>Allow Notifications</button>
   </div>;
 }
