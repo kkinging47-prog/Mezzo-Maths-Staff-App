@@ -51,6 +51,11 @@ html, body, #root { min-height: 100%; background: var(--bg); }
 .install-prompt strong { display: block; color: #0f172a; font-size: 14px; }
 .install-prompt span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
 .install-prompt.notification-prompt { bottom: 92px; }
+.notification-stack { position: fixed; right: 18px; top: 18px; z-index: 120; width: min(390px, calc(100% - 28px)); display: grid; gap: 10px; }
+.notification-toast { text-align: left; border: 1px solid #bfdbfe; border-left: 6px solid var(--primary); background: #fff; color: #0f172a; border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); cursor: pointer; }
+.notification-toast strong { display: block; font-size: 14px; margin-bottom: 4px; }
+.notification-toast span { display: block; color: var(--muted); font-size: 13px; line-height: 1.35; }
+.notification-status-warning { position: fixed; right: 18px; top: 18px; z-index: 119; width: min(430px, calc(100% - 28px)); border: 1px solid #fed7aa; border-left: 6px solid #f97316; background: #fff7ed; color: #9a3412; border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); font-size: 13px; font-weight: 800; }
 .floating-post-button { position: fixed; right: 24px; bottom: 24px; z-index: 60; border: 0; border-radius: 999px; padding: 16px 22px; background: var(--primary); color: #fff; font-weight: 900; box-shadow: var(--shadow); cursor: pointer; }
 .floating-post-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(15, 23, 42, 0.55); display: grid; place-items: center; padding: 18px; }
 .floating-post-card { width: min(620px, 100%); max-height: 92vh; overflow-y: auto; background: #fff; border-radius: 24px; padding: 22px; box-shadow: var(--shadow); }
@@ -77,4 +82,5 @@ html, body, #root { min-height: 100%; background: var(--bg); }
   .signature-preview { width: 100%; }
   .install-prompt { left: 14px; right: 14px; bottom: 14px; width: auto; flex-wrap: wrap; }
   .install-prompt.notification-prompt { bottom: 112px; }
+  .notification-stack, .notification-status-warning { left: 14px; right: 14px; top: 14px; width: auto; }
 }
