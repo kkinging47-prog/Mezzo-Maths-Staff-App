@@ -43,6 +43,8 @@ export function RealtimeNotifications() {
 
   useEffect(() => {
     if (!profile) return;
+    let mounted = true;
+    let subscribed = false;
     setConnectionIssue('');
     const channel = supabase.channel(`mezzo-notifications-${profile.id}`);
 
@@ -79,12 +81,16 @@ export function RealtimeNotifications() {
     });
 
     channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') setConnectionIssue('');
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      if (!mounted) return;
+      if (status === 'SUBSCRIBED') {
+        subscribed = true;
+        setConnectionIssue('');
+      }
+      if (!subscribed && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')) {
         setConnectionIssue('Realtime notifications are not connected. Ask admin to run the realtime SQL fix, then refresh.');
       }
     });
-    return () => { supabase.removeChannel(channel); };
+    return () => { mounted = false; supabase.removeChannel(channel); };
   }, [profile?.id, isAdmin, supervisor]);
 
   async function enable() {
