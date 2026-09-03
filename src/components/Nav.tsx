@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AlertTriangle, BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, CreditCard, FileSignature, FileText, Home, Landmark, LogOut, Mail, MapPin, Megaphone, MessageSquare, Settings, UserCog, Users, Video, Wallet } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, CreditCard, FileSignature, FileText, Home, Landmark, LogOut, Mail, MapPin, Megaphone, MessageSquare, Settings, ShieldCheck, UserCog, Users, Video, Wallet } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import { supabase } from '../lib/supabase';
 import { CompanyLogo } from './CompanyLogo';
 
 const itemClass = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? 'active' : ''}`;
@@ -11,6 +13,21 @@ export function Nav() {
   const { profile, signOut } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const supervisor = isSupervisor(profile?.position);
+  const [hasFinanceAccess, setHasFinanceAccess] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadFinanceAccess() {
+      if (!profile?.id || isAdmin) { if (mounted) setHasFinanceAccess(false); return; }
+      const { data } = await supabase.from('finance_user_access').select('id').eq('profile_id', profile.id).eq('active', true).maybeSingle();
+      if (mounted) setHasFinanceAccess(Boolean(data));
+    }
+    loadFinanceAccess();
+    return () => { mounted = false; };
+  }, [profile?.id, isAdmin]);
+
+  const canOpenFinance = isAdmin || hasFinanceAccess;
+
   return (
     <aside className="sidebar">
       <div className="brand"><CompanyLogo className="brand-logo" /><div><strong>Mezzo Staff</strong><span>Staff Portal</span></div></div>
@@ -35,7 +52,8 @@ export function Nav() {
         {!supervisor && <NavLink to="/workbooks" className={itemClass}><BookOpen size={18}/> Workbooks</NavLink>}
         <NavLink to="/documents" className={itemClass}><MessageSquare size={18}/> Letters & Payslip</NavLink>
         <NavLink to="/meetings" className={itemClass}><Video size={18}/> Meetings</NavLink>
-        {isAdmin && <NavLink to="/finance-admin" className={itemClass}><Landmark size={18}/> Finance Admin</NavLink>}
+        {canOpenFinance && <NavLink to="/finance-admin" className={itemClass}><Landmark size={18}/> Finance Admin</NavLink>}
+        {isAdmin && <NavLink to="/finance-access" className={itemClass}><ShieldCheck size={18}/> Finance Users</NavLink>}
         {isAdmin && <NavLink to="/payroll" className={itemClass}><CreditCard size={18}/> Payroll</NavLink>}
         {isAdmin && <NavLink to="/report-summary" className={itemClass}><BarChart3 size={18}/> Report Summary</NavLink>}
         {isAdmin && <NavLink to="/admin-documents" className={itemClass}><FileSignature size={18}/> Admin Documents</NavLink>}
