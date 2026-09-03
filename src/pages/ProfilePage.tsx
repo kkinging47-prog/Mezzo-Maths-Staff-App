@@ -70,6 +70,7 @@ export function ProfilePage() {
         home_address: form.home_address || null,
         guardian_name: form.guardian_name || null,
         guardian_contact: form.guardian_contact || null,
+        ssnit_number: form.ssnit_number || null,
         position: form.position || profile.position || 'Tutor',
         department: form.department || profile.department || 'Teaching',
         photo_url: photoUrl,
@@ -113,6 +114,7 @@ export function ProfilePage() {
         <label>Full Name<input value={form.full_name || ''} onChange={(e) => setField('full_name', e.target.value)} required /></label>
         <label>Email<input type="email" value={form.email || ''} onChange={(e) => setField('email', e.target.value)} required /></label>
         <label>Staff Number<input value={form.staff_no || ''} disabled /></label>
+        <label>SSNIT Number<input value={form.ssnit_number || ''} onChange={(e) => setField('ssnit_number', e.target.value)} placeholder="Enter SSNIT number if available" /></label>
         <label>Position<select value={form.position || 'Tutor'} onChange={(e) => setField('position', e.target.value)}>{positions.map((position) => <option key={position} value={position}>{position}</option>)}</select></label>
         <label>Department<select value={form.department || 'Teaching'} onChange={(e) => setField('department', e.target.value)}>{departments.map((dept) => <option key={dept} value={dept}>{dept}</option>)}</select></label>
         <label>Date Employed<input type="date" value={form.date_employed || ''} onChange={(e) => setField('date_employed', e.target.value)} /></label>
