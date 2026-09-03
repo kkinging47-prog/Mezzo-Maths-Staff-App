@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/auth';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { FinanceProtected } from './components/FinanceProtected';
 import { Layout } from './components/Layout';
 import { AppInstallPrompt } from './components/AppInstallPrompt';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
@@ -24,6 +25,7 @@ import { Loans } from './pages/Loans';
 import { CreditUnion } from './pages/CreditUnion';
 import { PayrollAdmin } from './pages/PayrollAdmin';
 import { FinanceAdmin } from './pages/FinanceAdmin';
+import { FinanceAccess } from './pages/FinanceAccess';
 import { SchoolSettings } from './pages/SchoolSettings';
 import { WorkbookOrders } from './pages/WorkbookOrders';
 import { ReportSummary } from './pages/ReportSummary';
@@ -57,7 +59,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/loans" element={<Loans />} />
             <Route path="/credit-union" element={<CreditUnion />} />
             <Route path="/payroll" element={<ProtectedRoute adminOnly><PayrollAdmin /></ProtectedRoute>} />
-            <Route path="/finance-admin" element={<ProtectedRoute adminOnly><FinanceAdmin /></ProtectedRoute>} />
+            <Route path="/finance-admin" element={<FinanceProtected><FinanceAdmin /></FinanceProtected>} />
+            <Route path="/finance-access" element={<ProtectedRoute adminOnly><FinanceAccess /></ProtectedRoute>} />
             <Route path="/school-settings" element={<ProtectedRoute adminOnly><SchoolSettings /></ProtectedRoute>} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/meetings" element={<Meetings />} />
