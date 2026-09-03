@@ -269,10 +269,5 @@ export function generatePayslip(profile: Profile, payroll: Payroll, extraDeducti
   doc.text('NET PAY', 20, y + 25);
   doc.text(formatMoney(netPay), 150, y + 25);
 
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Loan repayments, credit union contributions and approved deductions are automatically factored into this payslip.', 20, y + 48);
-  doc.text('This payslip was generated electronically from the staff portal.', 20, y + 56);
-
   doc.save(`${name.replace(/\s+/g, '_')}_${month.replace(/\s+/g, '_')}_Payslip.pdf`);
 }
