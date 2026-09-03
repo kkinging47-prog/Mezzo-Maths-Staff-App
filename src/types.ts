@@ -15,6 +15,7 @@ export interface Profile {
   home_address?: string | null;
   guardian_name?: string | null;
   guardian_contact?: string | null;
+  ssnit_number?: string | null;
   position?: string | null;
   department?: string | null;
   photo_url?: string | null;
