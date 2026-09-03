@@ -12,6 +12,7 @@ const emptyStaffForm = {
   password: '',
   temp_password: '',
   staff_no: '',
+  ssnit_number: '',
   role: 'staff' as 'staff' | 'admin',
   position: 'Tutor',
   department: 'Teaching',
@@ -34,6 +35,7 @@ function toStaffForm(row: Profile): StaffForm {
     full_name: row.full_name || '',
     email: row.email || '',
     staff_no: row.staff_no || '',
+    ssnit_number: (row as any).ssnit_number || '',
     role: row.role || 'staff',
     position: row.position || 'Tutor',
     department: row.department || 'Teaching',
@@ -138,6 +140,7 @@ export function AdminStaffManager({ staff, currentUserId, onChanged, onSuccess, 
       {mode === 'create' ? <label>Initial Password<PasswordInput value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} autoComplete="new-password" /></label> : <label>Set Temporary Password<PasswordInput value={form.temp_password} onChange={(e) => setForm({ ...form, temp_password: e.target.value })} minLength={6} autoComplete="new-password" /><small className="hint">Leave blank if you do not want to change their password.</small></label>}
       <label>Role<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as 'staff' | 'admin' })}><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
       <label>Staff Number<input value={form.staff_no} onChange={(e) => setForm({ ...form, staff_no: e.target.value })} /></label>
+      <label>SSNIT Number<input value={form.ssnit_number} onChange={(e) => setForm({ ...form, ssnit_number: e.target.value })} placeholder="Enter staff SSNIT number" /></label>
       <label>Position<select value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })}>{positions.map((position) => <option key={position} value={position}>{position}</option>)}</select></label>
       <label>Department<select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>{departments.map((dept) => <option key={dept} value={dept}>{dept}</option>)}</select></label>
       <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="active">Active</option><option value="left">Left Company</option></select></label>
@@ -155,7 +158,7 @@ export function AdminStaffManager({ staff, currentUserId, onChanged, onSuccess, 
   return <>
     {editStaffId && <form className="panel form-grid staff-admin-panel" onSubmit={saveEditedStaff}>
       <h2>Edit Saved Staff Details</h2>
-      <p className="hint">Update the staff record, login email, or set a new temporary password if the staff member forgets theirs.</p>
+      <p className="hint">Update the staff record, SSNIT number, login email, role, department, position, or set a new temporary password.</p>
       {staffFields(editStaffForm, setEditStaffForm, 'edit')}
       <div className="button-row"><button className="primary" disabled={busy}>{busy ? 'Saving changes...' : 'Save Staff Changes'}</button><button type="button" className="secondary" onClick={cancelEdit}>Cancel</button></div>
     </form>}
@@ -169,8 +172,8 @@ export function AdminStaffManager({ staff, currentUserId, onChanged, onSuccess, 
 
     <div className="panel staff-admin-panel">
       <h2>Staff List</h2>
-      <p className="hint">Use Edit to correct saved details, email, role, department, position, or to set a temporary password. Use Mark Left when a staff member has left the company.</p>
-      <div className="table-card compact-table"><table><thead><tr><th>Name</th><th>Email</th><th>Position</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map((row) => <tr key={row.id}><td>{row.full_name || '-'}</td><td>{row.email || '-'}</td><td>{row.position || '-'}</td><td>{row.department || '-'}</td><td><span className="pill">{row.role}</span></td><td><span className={`pill status-${row.status || 'active'}`}>{row.status || 'active'}</span></td><td><div className="button-row"><button type="button" className="primary small-button" disabled={busy} onClick={() => startEdit(row)}>Edit</button>{row.status === 'left' ? <button type="button" className="primary small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'active')}>Restore</button> : <button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'left')}>Mark Left</button>}<button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => deleteStaff(row)}>{row.id === currentUserId ? 'Current Admin' : 'Delete'}</button></div></td></tr>)}</tbody></table></div>
+      <p className="hint">Use Edit to correct saved details, SSNIT number, email, role, department, position, or to set a temporary password. Use Mark Left when a staff member has left the company.</p>
+      <div className="table-card compact-table"><table><thead><tr><th>Name</th><th>Email</th><th>Staff No.</th><th>SSNIT</th><th>Position</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map((row) => <tr key={row.id}><td>{row.full_name || '-'}</td><td>{row.email || '-'}</td><td>{row.staff_no || '-'}</td><td>{(row as any).ssnit_number || '-'}</td><td>{row.position || '-'}</td><td>{row.department || '-'}</td><td><span className="pill">{row.role}</span></td><td><span className={`pill status-${row.status || 'active'}`}>{row.status || 'active'}</span></td><td><div className="button-row"><button type="button" className="primary small-button" disabled={busy} onClick={() => startEdit(row)}>Edit</button>{row.status === 'left' ? <button type="button" className="primary small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'active')}>Restore</button> : <button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'left')}>Mark Left</button>}<button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => deleteStaff(row)}>{row.id === currentUserId ? 'Current Admin' : 'Delete'}</button></div></td></tr>)}</tbody></table></div>
     </div>
   </>;
 }
