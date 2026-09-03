@@ -29,6 +29,11 @@ function monthLabel(value: string) {
   return new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric' }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
+function displayRate(value: number | string | null | undefined) {
+  const rate = Number(value || 0);
+  return rate ? `${rate.toFixed(4)} (${(rate * 100).toFixed(2)}%)` : '0';
+}
+
 const loanSelect = '*, staff:profiles!staff_loans_staff_id_fkey(full_name,email,position)';
 
 export function Loans() {
@@ -52,7 +57,7 @@ export function Loans() {
 
   const calculation = useMemo(() => {
     const amount = Number(form.amount || 0);
-    const rate = Number(form.interest_rate || 0) / 100;
+    const rate = Number(form.interest_rate || 0);
     const months = Math.max(0, Number(form.repayment_months || 0));
     const interest = amount * rate * months;
     const total = amount + interest;
@@ -94,9 +99,9 @@ export function Loans() {
     if (!isAdmin || !profile) return;
     const amount = calculation.amount;
     const months = calculation.months;
-    const ratePercent = Number(form.interest_rate || 0);
-    if (!form.staff_id || amount <= 0 || months <= 0 || ratePercent < 0) {
-      setMessage('Please select staff and enter a valid loan amount, interest rate and repayment months.');
+    const rate = Number(form.interest_rate || 0);
+    if (!form.staff_id || amount <= 0 || months <= 0 || rate < 0) {
+      setMessage('Please select staff and enter a valid loan amount, decimal interest rate and repayment months.');
       return;
     }
     setBusy(true); setMessage('');
@@ -106,7 +111,7 @@ export function Loans() {
         staff_id: form.staff_id,
         created_by: profile.id,
         amount,
-        interest_rate: ratePercent,
+        interest_rate: rate,
         repayment_months: months,
         interest_amount: Number(calculation.interest.toFixed(2)),
         total_repayable: Number(calculation.total.toFixed(2)),
@@ -119,13 +124,14 @@ export function Loans() {
       }).select('id').single();
       if (error) throw error;
 
+      const monthlyRounded = Number(calculation.monthly.toFixed(2));
       const schedule = Array.from({ length: months }, (_, index) => ({
         loan_id: newLoan.id,
         staff_id: form.staff_id,
         repayment_month: addMonths(startMonth, index),
         scheduled_amount: index === months - 1
-          ? Number((calculation.total - Number(calculation.monthly.toFixed(2)) * (months - 1)).toFixed(2))
-          : Number(calculation.monthly.toFixed(2)),
+          ? Number((calculation.total - monthlyRounded * (months - 1)).toFixed(2))
+          : monthlyRounded,
         amount_paid: 0,
         paid: false,
         recorded_by: profile.id,
@@ -195,7 +201,8 @@ export function Loans() {
         position: row.staff?.position,
         issue_date: row.issue_date,
         amount_requested: row.amount,
-        interest_rate_percent: row.interest_rate,
+        interest_rate_decimal: row.interest_rate,
+        interest_rate_percent_equivalent: Number(row.interest_rate || 0) * 100,
         repayment_months: row.repayment_months,
         interest_amount: row.interest_amount,
         total_repayable: row.total_repayable,
@@ -228,20 +235,20 @@ export function Loans() {
 
     {isAdmin && <form className="panel form-grid" onSubmit={addLoan}>
       <h2>Add Office Loan</h2>
-      <p className="hint">Interest = (Amount Requested × Interest Rate) × Number of Months. Interest is added to the amount requested, then divided by the repayment months to calculate the monthly payment.</p>
+      <p className="hint">Interest = (Amount Requested × Interest Rate) × Number of Months. Enter the interest rate as a decimal. Example: 2.5% should be entered as 0.025, so 4000 × 0.025 × 10 = 1000.</p>
       <div className="grid two">
         <label>Staff<select value={form.staff_id} onChange={(e) => setForm({ ...form, staff_id: e.target.value })}>{staff.map((person) => <option key={person.id} value={person.id}>{person.full_name || person.email}</option>)}</select></label>
         <label>Issue Date<input type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} required /></label>
         <label>Amount Requested<input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></label>
-        <label>Interest Rate (%)<input type="number" min="0" step="0.01" value={form.interest_rate} onChange={(e) => setForm({ ...form, interest_rate: e.target.value })} placeholder="Example: 5" required /></label>
+        <label>Interest Rate Decimal<input type="number" min="0" step="0.0001" value={form.interest_rate} onChange={(e) => setForm({ ...form, interest_rate: e.target.value })} placeholder="Example: 0.025 for 2.5%" required /></label>
         <label>Number of Months for Repayment<input type="number" min="1" step="1" value={form.repayment_months} onChange={(e) => setForm({ ...form, repayment_months: e.target.value })} required /></label>
         <label>First Repayment Month & Year<input type="month" value={form.repayment_start_month} onChange={(e) => setForm({ ...form, repayment_start_month: e.target.value })} required /></label>
       </div>
       <div className="grid four">
+        <div className="metric-card"><span>Interest Rate Used</span><strong>{calculation.rate ? `${calculation.rate} = ${(calculation.rate * 100).toFixed(2)}%` : '0'}</strong></div>
         <div className="metric-card"><span>Interest</span><strong>{money(calculation.interest)}</strong></div>
         <div className="metric-card"><span>Total Repayable</span><strong>{money(calculation.total)}</strong></div>
         <div className="metric-card"><span>Monthly Payment</span><strong>{money(calculation.monthly)}</strong></div>
-        <div className="metric-card"><span>Repayment Months</span><strong>{calculation.months || 0}</strong></div>
       </div>
       <label>Notes<textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Reason for loan or repayment agreement." /></label>
       <button className="primary" disabled={busy}>{busy ? 'Saving...' : 'Save Loan & Repayment Schedule'}</button>
@@ -268,7 +275,7 @@ export function Loans() {
         const schedule = repayments.filter((item) => item.loan_id === row.id);
         const done = schedule.filter((item) => item.paid).length;
         const left = Math.max(0, Number(row.repayment_months || schedule.length) - done);
-        return <tr key={row.id}><td>{row.issue_date}</td><td>{row.staff?.full_name || row.staff?.email || '-'}</td><td>{money(row.amount)}</td><td>{Number(row.interest_rate || 0).toFixed(2)}%</td><td>{money(row.interest_amount)}</td><td>{money(row.total_repayable ?? row.amount)}</td><td>{row.repayment_months || '-'}</td><td>{row.monthly_repayment ? money(row.monthly_repayment) : '-'}</td><td>{done}</td><td>{left}</td><td>{money(row.balance)}</td><td><span className={`pill status-${row.status}`}>{row.status}</span></td>{isAdmin && <td><div className="button-row"><button className="primary small-button" disabled={busy || row.status === 'active'} onClick={() => updateLoan(row, 'active')}>Active</button><button className="primary small-button" disabled={busy || row.status === 'cleared'} onClick={() => updateLoan(row, 'cleared')}>Clear</button><button className="danger small-button" disabled={busy || row.status === 'cancelled'} onClick={() => updateLoan(row, 'cancelled')}>Cancel</button></div></td>}</tr>;
+        return <tr key={row.id}><td>{row.issue_date}</td><td>{row.staff?.full_name || row.staff?.email || '-'}</td><td>{money(row.amount)}</td><td>{displayRate(row.interest_rate)}</td><td>{money(row.interest_amount)}</td><td>{money(row.total_repayable ?? row.amount)}</td><td>{row.repayment_months || '-'}</td><td>{row.monthly_repayment ? money(row.monthly_repayment) : '-'}</td><td>{done}</td><td>{left}</td><td>{money(row.balance)}</td><td><span className={`pill status-${row.status}`}>{row.status}</span></td>{isAdmin && <td><div className="button-row"><button className="primary small-button" disabled={busy || row.status === 'active'} onClick={() => updateLoan(row, 'active')}>Active</button><button className="primary small-button" disabled={busy || row.status === 'cleared'} onClick={() => updateLoan(row, 'cleared')}>Clear</button><button className="danger small-button" disabled={busy || row.status === 'cancelled'} onClick={() => updateLoan(row, 'cancelled')}>Cancel</button></div></td>}</tr>;
       })}</tbody></table></div>
       {loans.length === 0 && <div className="empty">No loan records found.</div>}
     </div>
