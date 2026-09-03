@@ -200,7 +200,7 @@ export function PayrollAdmin() {
     setBusy(true);
     try {
       for (const row of rows) {
-        await supabase.from('payrolls').delete().eq('staff_id', row.staff_id).gte('month', `${selectedMonthKey}-01`).lte('month', `${selectedMonthKey}-31`);
+        await supabase.from('payrolls').delete().eq('staff_id', row.staff_id).eq('month', selectedMonthStart);
       }
       const records = rows.map((row) => ({
         staff_id: row.staff_id,
