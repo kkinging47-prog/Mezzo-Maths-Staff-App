@@ -11,6 +11,7 @@ type StaffPayload = {
   temp_password?: string;
   full_name?: string;
   staff_no?: string;
+  ssnit_number?: string;
   role?: 'admin' | 'staff';
   phone?: string;
   position?: string;
@@ -64,6 +65,7 @@ function profilePayload(staff: StaffPayload) {
     email,
     full_name: cleanText(staff.full_name),
     staff_no: cleanText(staff.staff_no),
+    ssnit_number: cleanText(staff.ssnit_number),
     phone: cleanText(staff.phone),
     position: cleanText(staff.position) || 'Tutor',
     department: cleanText(staff.department) || 'Teaching',
