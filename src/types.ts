@@ -1,5 +1,6 @@
 export type UserRole = 'admin' | 'staff';
 export type AppointmentLetterStatus = 'pending' | 'approved' | 'rejected';
+export type PayrollStatus = 'draft' | 'approved' | 'cancelled';
 
 export interface Profile {
   id: string;
@@ -83,6 +84,7 @@ export interface Payroll {
   basic_salary: number;
   allowances: number;
   deductions: number;
+  status?: PayrollStatus | null;
   paid_on?: string | null;
 }
 
