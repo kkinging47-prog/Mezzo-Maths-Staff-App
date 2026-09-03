@@ -1,10 +1,18 @@
-import { useEffect, useState } from 'react';
-import { generateAppointmentLetter, generatePayslip } from '../lib/documents';
+import { useEffect, useMemo, useState } from 'react';
+import { generateAppointmentLetter, generatePayslip, PayslipDeductionLine } from '../lib/documents';
 import { generateBindingAgreement } from '../lib/bindingAgreement';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { AppointmentLetterRequest, Payroll } from '../types';
 import { StatusMessage } from '../components/StatusMessage';
+
+function monthKey(value?: string | null) {
+  return value ? value.slice(0, 7) : '';
+}
+
+function money(value: number | string | null | undefined) {
+  return `GHS ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 export function Documents() {
   const { profile } = useAuth();
@@ -12,6 +20,9 @@ export function Documents() {
   const [appointmentRequests, setAppointmentRequests] = useState<AppointmentLetterRequest[]>([]);
   const [uploadedLetters, setUploadedLetters] = useState<any[]>([]);
   const [bindingRecord, setBindingRecord] = useState<any>(null);
+  const [loanRepayments, setLoanRepayments] = useState<any[]>([]);
+  const [creditUnionRows, setCreditUnionRows] = useState<any[]>([]);
+  const [attendanceDeductions, setAttendanceDeductions] = useState<any[]>([]);
   const [signatureName, setSignatureName] = useState('');
   const [selectedPayroll, setSelectedPayroll] = useState('');
   const [message, setMessage] = useState('');
@@ -20,26 +31,49 @@ export function Documents() {
 
   async function load() {
     if (!profile) return;
-    const [{ data: payrollData, error: payrollError }, { data: requestData, error: requestError }, { data: uploadData }, { data: agreementData }] = await Promise.all([
+    const [{ data: payrollData, error: payrollError }, { data: requestData, error: requestError }, { data: uploadData }, { data: agreementData }, { data: loanData }, { data: creditData }, { data: attendanceData }] = await Promise.all([
       supabase.from('payrolls').select('*').eq('staff_id', profile.id).order('month', { ascending: false }),
       supabase.from('appointment_letter_requests').select('*').eq('staff_id', profile.id).order('requested_at', { ascending: false }),
       supabase.from('appointment_letter_uploads').select('*').eq('staff_id', profile.id).order('created_at', { ascending: false }),
       supabase.from('binding_agreements').select('*').eq('staff_id', profile.id).maybeSingle(),
+      supabase.from('staff_loan_repayments').select('*, staff_loans(balance,total_repayable,amount)').eq('staff_id', profile.id).order('repayment_month', { ascending: false }),
+      supabase.from('credit_union_contributions').select('*').eq('staff_id', profile.id).order('contribution_month', { ascending: false }),
+      supabase.from('attendance_deductions').select('*').eq('staff_id', profile.id).eq('status', 'approved').order('work_date', { ascending: false }),
     ]);
     if (payrollError || requestError) { setType('error'); setMessage(payrollError?.message || requestError?.message || 'Could not load documents.'); return; }
     setPayrolls((payrollData || []) as Payroll[]);
     setAppointmentRequests((requestData || []) as AppointmentLetterRequest[]);
     setUploadedLetters(uploadData || []);
     setBindingRecord(agreementData || null);
-    if (payrollData?.[0]) setSelectedPayroll(payrollData[0].id);
+    setLoanRepayments(loanData || []);
+    setCreditUnionRows(creditData || []);
+    setAttendanceDeductions(attendanceData || []);
+    if (payrollData?.[0]) setSelectedPayroll((current) => current || payrollData[0].id);
   }
 
   useEffect(() => { load(); }, [profile?.id]);
 
   const payroll = payrolls.find((item) => item.id === selectedPayroll);
+  const selectedMonth = monthKey(payroll?.month);
   const latestRequest = appointmentRequests[0];
   const approvedRequest = latestRequest?.status === 'approved' ? latestRequest : undefined;
   const pendingRequest = latestRequest?.status === 'pending' ? latestRequest : undefined;
+
+  const payslipDeductionLines = useMemo<PayslipDeductionLine[]>(() => {
+    if (!selectedMonth) return [];
+    const loanDue = loanRepayments.filter((row) => monthKey(row.repayment_month) === selectedMonth).reduce((sum, row) => sum + Number(row.scheduled_amount || 0), 0);
+    const creditUnion = creditUnionRows.filter((row) => monthKey(row.contribution_month) === selectedMonth).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const attendance = attendanceDeductions.filter((row) => monthKey(row.work_date) === selectedMonth).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const lines: PayslipDeductionLine[] = [];
+    if (loanDue > 0) lines.push({ label: 'Staff Loan Repayment', amount: loanDue, note: 'Scheduled loan repayment for this payslip month.' });
+    if (creditUnion > 0) lines.push({ label: 'Credit Union Contribution', amount: creditUnion, note: 'Credit union shares/contribution for this payslip month.' });
+    if (attendance > 0) lines.push({ label: 'Attendance Deductions', amount: attendance, note: 'Approved attendance deduction(s) for this month.' });
+    return lines;
+  }, [selectedMonth, loanRepayments, creditUnionRows, attendanceDeductions]);
+
+  const totalAutomaticDeductions = payslipDeductionLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+  const totalPayslipDeductions = Number(payroll?.deductions || 0) + totalAutomaticDeductions;
+  const netPay = Number(payroll?.basic_salary || 0) + Number(payroll?.allowances || 0) - totalPayslipDeductions;
 
   async function requestAppointmentLetter() {
     if (!profile) return;
@@ -81,7 +115,7 @@ export function Documents() {
         {approvedRequest ? <><div className="approval-card approved"><strong>Approved</strong><span>Position: {approvedRequest.position || profile?.position || '-'}</span><span>Monthly salary: {approvedRequest.monthly_salary ? `GHS ${Number(approvedRequest.monthly_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'As approved by management'}</span></div><button className="primary" onClick={downloadAppointmentLetter}>Download Generated Appointment Letter PDF</button></> : pendingRequest ? <div className="approval-card pending"><strong>Pending admin approval</strong><span>Requested on {new Date(pendingRequest.requested_at).toLocaleDateString()}.</span></div> : <><button className="primary" disabled={requestBusy} onClick={requestAppointmentLetter}>{requestBusy ? 'Sending request...' : 'Request Admin Approval'}</button>{latestRequest?.status === 'rejected' && <div className="approval-card rejected"><strong>Previous request rejected</strong><span>{latestRequest.admin_notes || 'No reason was added by admin.'}</span></div>}</>}
       </div>
       <div className="panel form-grid"><h2>Employee Binding Agreement</h2><p className="muted">Every new entrant should sign this agreement covering Mezzo House knowledge, methods, intellectual property and confidentiality.</p>{bindingRecord ? <div className="approval-card approved"><strong>Signed</strong><span>Signed as {bindingRecord.signed_name}</span><span>{new Date(bindingRecord.signed_at).toLocaleString()}</span><button className="primary" onClick={() => profile && generateBindingAgreement(profile, bindingRecord.signed_name)}>Download Signed Copy</button></div> : <><label>Type your full name as signature<input value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder={profile?.full_name || 'Full name'} /></label><button className="primary" onClick={signBindingAgreement}>Sign and Download Agreement</button></>}</div>
-      <div className="panel"><h2>Monthly Payslip</h2>{payrolls.length === 0 ? <p className="muted">No payslip has been uploaded for your account yet.</p> : <><label>Month<select value={selectedPayroll} onChange={(e) => setSelectedPayroll(e.target.value)}>{payrolls.map((row) => <option key={row.id} value={row.id}>{new Date(row.month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</option>)}</select></label><button className="primary" onClick={() => profile && payroll && generatePayslip(profile, payroll)}>Generate Payslip PDF</button></>}</div>
+      <div className="panel form-grid"><h2>Monthly Payslip</h2>{payrolls.length === 0 ? <p className="muted">No payslip has been uploaded for your account yet.</p> : <><label>Month<select value={selectedPayroll} onChange={(e) => setSelectedPayroll(e.target.value)}>{payrolls.map((row) => <option key={row.id} value={row.id}>{new Date(row.month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</option>)}</select></label>{payroll && <div className="approval-card approved"><strong>Payslip Deduction Preview</strong><span>Salary/allowances: {money(Number(payroll.basic_salary || 0) + Number(payroll.allowances || 0))}</span>{Number(payroll.deductions || 0) > 0 && <span>Other deductions: {money(payroll.deductions)}</span>}{payslipDeductionLines.map((line) => <span key={line.label}>{line.label}: {money(line.amount)}</span>)}<span>Total deductions: {money(totalPayslipDeductions)}</span><span>Net pay after deductions: {money(netPay)}</span></div>}<button className="primary" onClick={() => profile && payroll && generatePayslip(profile, payroll, payslipDeductionLines)}>Generate Payslip PDF</button></>}</div>
     </div>
   </section>;
 }
