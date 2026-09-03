@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { Comment, CompanyPost, Profile } from '../types';
@@ -22,6 +23,7 @@ export function Dashboard() {
   const [salaryDate, setSalaryDate] = useState('');
   const [academicYear, setAcademicYear] = useState('2026/2027');
   const [term, setTerm] = useState('Term 1');
+  const [hasTimetable, setHasTimetable] = useState(true);
   const [message, setMessage] = useState('');
 
   async function loadPosts() {
@@ -54,7 +56,13 @@ export function Dashboard() {
     const settings = Object.fromEntries((data || []).map((row: any) => [row.key, row.value]));
     setSalaryDate(settings.salary_pay_date || ''); setAcademicYear(settings.current_academic_year || '2026/2027'); setTerm(settings.current_term || 'Term 1');
   }
+  async function loadTimetableStatus() {
+    if (!profile?.id || isAdmin) { setHasTimetable(true); return; }
+    const { count, error } = await supabase.from('staff_timetables').select('id', { count: 'exact', head: true }).eq('staff_id', profile.id);
+    if (!error) setHasTimetable(Number(count || 0) > 0);
+  }
   useEffect(() => { loadPosts(); loadScoreboard(); loadSettings(); }, []);
+  useEffect(() => { loadTimetableStatus(); }, [profile?.id, isAdmin]);
   useEffect(() => { loadComments(posts.map((post) => post.id)); }, [posts]);
   useEffect(() => {
     const channel = supabase.channel('company-dashboard-feed').on('postgres_changes', { event: '*', schema: 'public', table: 'company_posts' }, loadPosts).on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, loadPosts).subscribe();
@@ -71,6 +79,8 @@ export function Dashboard() {
   return <section>
     <div className="page-header"><div><h1>Company Dashboard</h1><p>Updates, announcements, attendance and staff comments.</p></div></div>
     <StatusMessage message={message} type="error" />
+
+    {!isAdmin && !hasTimetable && <div className="status warning timetable-warning"><strong>Timetable needed.</strong><br />Please update your weekly school timetable. Your first week is deduction-free, but after that, attendance deductions can be created from your timetable days. <Link to="/timetable">Update timetable now</Link>.</div>}
 
     <h2>Latest Updates</h2>
     <div className="feed dashboard-updates-first">
