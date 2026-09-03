@@ -22,6 +22,7 @@ import { Handbook } from './pages/Handbook';
 import { Deductions } from './pages/Deductions';
 import { Loans } from './pages/Loans';
 import { CreditUnion } from './pages/CreditUnion';
+import { PayrollAdmin } from './pages/PayrollAdmin';
 import { SchoolSettings } from './pages/SchoolSettings';
 import { WorkbookOrders } from './pages/WorkbookOrders';
 import { ReportSummary } from './pages/ReportSummary';
@@ -54,6 +55,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/deductions" element={<Deductions />} />
             <Route path="/loans" element={<Loans />} />
             <Route path="/credit-union" element={<CreditUnion />} />
+            <Route path="/payroll" element={<ProtectedRoute adminOnly><PayrollAdmin /></ProtectedRoute>} />
             <Route path="/school-settings" element={<ProtectedRoute adminOnly><SchoolSettings /></ProtectedRoute>} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/meetings" element={<Meetings />} />
