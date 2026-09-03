@@ -172,7 +172,6 @@ iframe {
   width: 100%;
 }
 
-/* Prevent long cards/forms from looking like one wide stretched strip on large screens. */
 form.panel.form-grid:not(.staff-admin-panel),
 .panel.form-grid:not(.staff-admin-panel) {
   justify-items: start;
@@ -183,13 +182,65 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   justify-self: stretch;
 }
 
-/* Admin staff and payroll sections still need room, but fields should not stretch too far. */
 .staff-admin-panel .form-grid > label,
 .staff-admin-panel .form-grid > .grid,
 .staff-admin-panel label input,
 .staff-admin-panel label select,
 .staff-admin-panel label textarea {
   max-width: 100%;
+}
+
+/* Payroll/admin form: keep fields balanced and stop the allowances box from overflowing. */
+.payroll-panel {
+  grid-column: 1 / -1;
+  max-width: 980px;
+}
+
+.payroll-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 16px 24px;
+  width: 100%;
+  max-width: 920px;
+}
+
+.payroll-form-grid label,
+.payroll-form-grid input,
+.payroll-form-grid select {
+  width: 100%;
+  min-width: 0;
+}
+
+.payroll-form-grid .wide-field,
+.payroll-preview-card {
+  grid-column: 1 / -1;
+}
+
+.payroll-preview-card {
+  max-width: 920px;
+}
+
+/* Catch common admin and report sections before they turn into very wide strips. */
+.approval-form-grid,
+.supervisor-filter,
+.share-row,
+.post-head,
+.dashboard-profile-card,
+.profile-photo-row {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.approval-form-grid {
+  min-width: 0;
+}
+
+.supervisor-filter > *,
+.share-row > *,
+.post-head > *,
+.dashboard-profile-card > *,
+.profile-photo-row > * {
+  min-width: 0;
 }
 
 @media (max-width: 1250px) {
@@ -212,10 +263,14 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
 
   .grid.two,
   .grid.three,
-  .grid.four {
+  .grid.four,
+  .payroll-form-grid {
     grid-template-columns: 1fr;
   }
 
+  .payroll-panel,
+  .payroll-form-grid,
+  .payroll-preview-card,
   .form-grid > label,
   .form-grid > .grid,
   .form-grid > .button-row,
