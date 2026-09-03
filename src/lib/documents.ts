@@ -6,6 +6,12 @@ import { getAdminSignatureAsset } from './adminSignature';
 
 const companyName = import.meta.env.VITE_COMPANY_NAME || 'Mezzo House Limited';
 
+export type PayslipDeductionLine = {
+  label: string;
+  amount: number;
+  note?: string;
+};
+
 function formatMoney(value: number | string | null | undefined) {
   const amount = Number(value || 0);
   return `GHS ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -196,11 +202,19 @@ export function generateEmploymentLetter(profile: Profile) {
   doc.save(`${name.replace(/\s+/g, '_')}_Employment_Letter.pdf`);
 }
 
-export function generatePayslip(profile: Profile, payroll: Payroll) {
+export function generatePayslip(profile: Profile, payroll: Payroll, extraDeductions: PayslipDeductionLine[] = []) {
   const doc = new jsPDF();
   const name = profile.full_name || 'Staff Member';
   const month = payroll.month ? format(new Date(payroll.month), 'MMMM yyyy') : 'Selected Month';
-  const netPay = Number(payroll.basic_salary || 0) + Number(payroll.allowances || 0) - Number(payroll.deductions || 0);
+  const basicSalary = Number(payroll.basic_salary || 0);
+  const allowances = Number(payroll.allowances || 0);
+  const payrollDeduction = Number(payroll.deductions || 0);
+  const deductionLines = [
+    ...(payrollDeduction > 0 ? [{ label: 'Other / Admin Deductions', amount: payrollDeduction }] : []),
+    ...extraDeductions.filter((line) => Number(line.amount || 0) > 0),
+  ];
+  const totalDeductions = deductionLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+  const netPay = basicSalary + allowances - totalDeductions;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
@@ -220,24 +234,45 @@ export function generatePayslip(profile: Profile, payroll: Payroll) {
   doc.text('Amount', 150, 102);
   doc.setFont('helvetica', 'normal');
   doc.text('Basic Salary', 20, 115);
-  doc.text(formatMoney(payroll.basic_salary), 150, 115);
+  doc.text(formatMoney(basicSalary), 150, 115);
   doc.text('Allowances', 20, 128);
-  doc.text(formatMoney(payroll.allowances), 150, 128);
+  doc.text(formatMoney(allowances), 150, 128);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Deductions', 20, 150);
+  doc.text('Amount', 150, 150);
   doc.setFont('helvetica', 'normal');
-  doc.text('Total Deductions', 20, 163);
-  doc.text(formatMoney(payroll.deductions), 150, 163);
+  let y = 163;
+  if (deductionLines.length === 0) {
+    doc.text('No deductions', 20, y);
+    doc.text(formatMoney(0), 150, y);
+    y += 13;
+  } else {
+    deductionLines.forEach((line) => {
+      doc.text(line.label, 20, y);
+      doc.text(formatMoney(line.amount), 150, y);
+      y += 10;
+      if (line.note) {
+        doc.setFontSize(8.5);
+        doc.text(line.note, 24, y);
+        doc.setFontSize(11);
+        y += 8;
+      }
+    });
+  }
 
   doc.setFont('helvetica', 'bold');
+  doc.text('Total Deductions', 20, y + 4);
+  doc.text(formatMoney(totalDeductions), 150, y + 4);
+
   doc.setFontSize(13);
-  doc.text('NET PAY', 20, 190);
-  doc.text(formatMoney(netPay), 150, 190);
+  doc.text('NET PAY', 20, y + 25);
+  doc.text(formatMoney(netPay), 150, y + 25);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('This payslip was generated electronically from the staff portal.', 20, 215);
+  doc.text('Loan repayments, credit union contributions and approved deductions are automatically factored into this payslip.', 20, y + 48);
+  doc.text('This payslip was generated electronically from the staff portal.', 20, y + 56);
 
   doc.save(`${name.replace(/\s+/g, '_')}_${month.replace(/\s+/g, '_')}_Payslip.pdf`);
 }
