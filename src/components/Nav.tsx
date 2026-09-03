@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { AlertTriangle, BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, CreditCard, FileSignature, FileText, Home, LogOut, Mail, MapPin, Megaphone, MessageSquare, Settings, UserCog, Users, Video, Wallet } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, CreditCard, FileSignature, FileText, Home, Landmark, LogOut, Mail, MapPin, Megaphone, MessageSquare, Settings, UserCog, Users, Video, Wallet } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { CompanyLogo } from './CompanyLogo';
 
@@ -35,6 +35,7 @@ export function Nav() {
         {!supervisor && <NavLink to="/workbooks" className={itemClass}><BookOpen size={18}/> Workbooks</NavLink>}
         <NavLink to="/documents" className={itemClass}><MessageSquare size={18}/> Letters & Payslip</NavLink>
         <NavLink to="/meetings" className={itemClass}><Video size={18}/> Meetings</NavLink>
+        {isAdmin && <NavLink to="/finance-admin" className={itemClass}><Landmark size={18}/> Finance Admin</NavLink>}
         {isAdmin && <NavLink to="/payroll" className={itemClass}><CreditCard size={18}/> Payroll</NavLink>}
         {isAdmin && <NavLink to="/report-summary" className={itemClass}><BarChart3 size={18}/> Report Summary</NavLink>}
         {isAdmin && <NavLink to="/admin-documents" className={itemClass}><FileSignature size={18}/> Admin Documents</NavLink>}
