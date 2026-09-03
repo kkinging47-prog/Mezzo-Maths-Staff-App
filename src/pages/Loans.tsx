@@ -12,6 +12,8 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const loanSelect = '*, staff:profiles!staff_loans_staff_id_fkey(full_name,email,position)';
+
 export function Loans() {
   const { profile } = useAuth();
   const [staff, setStaff] = useState<Profile[]>([]);
@@ -26,14 +28,14 @@ export function Loans() {
     if (isAdmin) {
       const [{ data: staffRows }, { data: loanRows, error }] = await Promise.all([
         supabase.from('profiles').select('*').neq('status', 'left').order('full_name'),
-        supabase.from('staff_loans').select('*, profiles(full_name,email,position)').order('issue_date', { ascending: false }).order('created_at', { ascending: false }),
+        supabase.from('staff_loans').select(loanSelect).order('issue_date', { ascending: false }).order('created_at', { ascending: false }),
       ]);
       const staffList = (staffRows || []) as Profile[];
       setStaff(staffList);
       if (!form.staff_id && staffList[0]) setForm((prev) => ({ ...prev, staff_id: staffList[0].id }));
       if (error) setMessage(error.message); else setLoans(loanRows || []);
     } else {
-      const { data, error } = await supabase.from('staff_loans').select('*, profiles(full_name,email,position)').eq('staff_id', profile.id).order('issue_date', { ascending: false });
+      const { data, error } = await supabase.from('staff_loans').select(loanSelect).eq('staff_id', profile.id).order('issue_date', { ascending: false });
       if (error) setMessage(error.message); else setLoans(data || []);
     }
   }
@@ -79,8 +81,8 @@ export function Loans() {
 
   function exportCsv() {
     downloadCsv('staff-loans.csv', loans.map((row) => ({
-      staff: row.profiles?.full_name || row.profiles?.email,
-      position: row.profiles?.position,
+      staff: row.staff?.full_name || row.staff?.email,
+      position: row.staff?.position,
       issue_date: row.issue_date,
       amount: row.amount,
       balance: row.balance,
@@ -119,7 +121,7 @@ export function Loans() {
 
     <div className="panel">
       <h2>{isAdmin ? 'All Staff Loans' : 'My Office Loans'}</h2>
-      <div className="table-card"><table><thead><tr><th>Date</th><th>Staff</th><th>Amount</th><th>Balance</th><th>Monthly Repayment</th><th>Status</th><th>Notes</th>{isAdmin && <th>Actions</th>}</tr></thead><tbody>{loans.map((row) => <tr key={row.id}><td>{row.issue_date}</td><td>{row.profiles?.full_name || row.profiles?.email || '-'}</td><td>{money(row.amount)}</td><td>{money(row.balance)}</td><td>{row.monthly_repayment ? money(row.monthly_repayment) : '-'}</td><td><span className={`pill status-${row.status}`}>{row.status}</span></td><td>{row.notes || '-'}</td>{isAdmin && <td><div className="button-row"><button className="primary small-button" disabled={busy || row.status === 'active'} onClick={() => updateLoan(row, 'active')}>Active</button><button className="primary small-button" disabled={busy || row.status === 'cleared'} onClick={() => updateLoan(row, 'cleared')}>Clear</button><button className="danger small-button" disabled={busy || row.status === 'cancelled'} onClick={() => updateLoan(row, 'cancelled')}>Cancel</button></div></td>}</tr>)}</tbody></table></div>
+      <div className="table-card"><table><thead><tr><th>Date</th><th>Staff</th><th>Amount</th><th>Balance</th><th>Monthly Repayment</th><th>Status</th><th>Notes</th>{isAdmin && <th>Actions</th>}</tr></thead><tbody>{loans.map((row) => <tr key={row.id}><td>{row.issue_date}</td><td>{row.staff?.full_name || row.staff?.email || '-'}</td><td>{money(row.amount)}</td><td>{money(row.balance)}</td><td>{row.monthly_repayment ? money(row.monthly_repayment) : '-'}</td><td><span className={`pill status-${row.status}`}>{row.status}</span></td><td>{row.notes || '-'}</td>{isAdmin && <td><div className="button-row"><button className="primary small-button" disabled={busy || row.status === 'active'} onClick={() => updateLoan(row, 'active')}>Active</button><button className="primary small-button" disabled={busy || row.status === 'cleared'} onClick={() => updateLoan(row, 'cleared')}>Clear</button><button className="danger small-button" disabled={busy || row.status === 'cancelled'} onClick={() => updateLoan(row, 'cancelled')}>Cancel</button></div></td>}</tr>)}</tbody></table></div>
       {loans.length === 0 && <div className="empty">No loan records found.</div>}
     </div>
   </section>;
