@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { PasswordInput } from './PasswordInput';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
@@ -51,6 +51,14 @@ function toStaffForm(row: Profile): StaffForm {
   };
 }
 
+function staffLabel(row: Profile) {
+  return [row.full_name, row.staff_no, row.email, row.position].filter(Boolean).join(' · ') || row.id;
+}
+
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
 interface AdminStaffManagerProps {
   staff: Profile[];
   currentUserId?: string;
@@ -63,7 +71,15 @@ export function AdminStaffManager({ staff, currentUserId, onChanged, onSuccess, 
   const [newStaffForm, setNewStaffForm] = useState(emptyStaffForm);
   const [editStaffId, setEditStaffId] = useState('');
   const [editStaffForm, setEditStaffForm] = useState<StaffForm>(emptyStaffForm);
+  const [staffSearch, setStaffSearch] = useState('');
+  const [quickStaffId, setQuickStaffId] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const filteredStaff = useMemo(() => {
+    const query = normalize(staffSearch);
+    if (!query) return staff;
+    return staff.filter((row) => normalize(staffLabel(row)).includes(query));
+  }, [staff, staffSearch]);
 
   async function callStaffApi(payload: Record<string, unknown>) {
     const { data } = await supabase.auth.getSession();
@@ -91,6 +107,12 @@ export function AdminStaffManager({ staff, currentUserId, onChanged, onSuccess, 
     setEditStaffId(row.id);
     setEditStaffForm(toStaffForm(row));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function openQuickStaff(id: string) {
+    setQuickStaffId(id);
+    const row = staff.find((item) => item.id === id);
+    if (row) startEdit(row);
   }
 
   function cancelEdit() {
@@ -172,8 +194,14 @@ export function AdminStaffManager({ staff, currentUserId, onChanged, onSuccess, 
 
     <div className="panel staff-admin-panel">
       <h2>Staff List</h2>
-      <p className="hint">Use Edit to correct saved details, SSNIT number, email, role, department, position, or to set a temporary password. Use Mark Left when a staff member has left the company.</p>
-      <div className="table-card compact-table"><table><thead><tr><th>Name</th><th>Email</th><th>Staff No.</th><th>SSNIT</th><th>Position</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{staff.map((row) => <tr key={row.id}><td>{row.full_name || '-'}</td><td>{row.email || '-'}</td><td>{row.staff_no || '-'}</td><td>{(row as any).ssnit_number || '-'}</td><td>{row.position || '-'}</td><td>{row.department || '-'}</td><td><span className="pill">{row.role}</span></td><td><span className={`pill status-${row.status || 'active'}`}>{row.status || 'active'}</span></td><td><div className="button-row"><button type="button" className="primary small-button" disabled={busy} onClick={() => startEdit(row)}>Edit</button>{row.status === 'left' ? <button type="button" className="primary small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'active')}>Restore</button> : <button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'left')}>Mark Left</button>}<button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => deleteStaff(row)}>{row.id === currentUserId ? 'Current Admin' : 'Delete'}</button></div></td></tr>)}</tbody></table></div>
+      <p className="hint">Search or use the quick selector to jump directly to a staff member instead of scrolling through the full list.</p>
+      <div className="grid two staff-search-tools">
+        <label>Search staff<input value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder="Type name, staff number, email or position" /></label>
+        <label>Quick staff selector<select value={quickStaffId} onChange={(e) => openQuickStaff(e.target.value)}><option value="">Select staff to edit</option>{staff.map((row) => <option key={row.id} value={row.id}>{staffLabel(row)}</option>)}</select></label>
+      </div>
+      <p className="hint">Showing {filteredStaff.length} of {staff.length} staff members.</p>
+      <div className="table-card compact-table"><table><thead><tr><th>Name</th><th>Email</th><th>Staff No.</th><th>SSNIT</th><th>Position</th><th>Department</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>{filteredStaff.map((row) => <tr key={row.id}><td>{row.full_name || '-'}</td><td>{row.email || '-'}</td><td>{row.staff_no || '-'}</td><td>{(row as any).ssnit_number || '-'}</td><td>{row.position || '-'}</td><td>{row.department || '-'}</td><td><span className="pill">{row.role}</span></td><td><span className={`pill status-${row.status || 'active'}`}>{row.status || 'active'}</span></td><td><div className="button-row"><button type="button" className="primary small-button" disabled={busy} onClick={() => startEdit(row)}>Edit</button>{row.status === 'left' ? <button type="button" className="primary small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'active')}>Restore</button> : <button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => setStaffStatus(row, 'left')}>Mark Left</button>}<button type="button" className="danger small-button" disabled={busy || row.id === currentUserId} onClick={() => deleteStaff(row)}>{row.id === currentUserId ? 'Current Admin' : 'Delete'}</button></div></td></tr>)}</tbody></table></div>
+      {filteredStaff.length === 0 && <div className="empty">No staff member matches your search.</div>}
     </div>
   </>;
 }
