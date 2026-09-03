@@ -6,12 +6,35 @@ import { supabase } from '../lib/supabase';
 import { AppointmentLetterRequest, Payroll } from '../types';
 import { StatusMessage } from '../components/StatusMessage';
 
+const SSNIT_EMPLOYEE_RATE = 0.055;
+const payeBands = [
+  { amount: 588, rate: 0 },
+  { amount: 80, rate: 0.05 },
+  { amount: 100, rate: 0.10 },
+  { amount: 2900, rate: 0.175 },
+  { amount: 16000, rate: 0.25 },
+  { amount: 30332, rate: 0.30 },
+];
+
 function monthKey(value?: string | null) {
   return value ? value.slice(0, 7) : '';
 }
 
 function money(value: number | string | null | undefined) {
   return `GHS ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function calculatePayeMonthly(basicSalary: number) {
+  let remaining = Math.max(0, Number(basicSalary || 0));
+  let tax = 0;
+  payeBands.forEach((band) => {
+    if (remaining <= 0) return;
+    const taxable = Math.min(remaining, band.amount);
+    tax += taxable * band.rate;
+    remaining -= taxable;
+  });
+  if (remaining > 0) tax += remaining * 0.35;
+  return Number(tax.toFixed(2));
 }
 
 export function Documents() {
@@ -60,16 +83,22 @@ export function Documents() {
   const pendingRequest = latestRequest?.status === 'pending' ? latestRequest : undefined;
 
   const payslipDeductionLines = useMemo<PayslipDeductionLine[]>(() => {
-    if (!selectedMonth) return [];
+    if (!selectedMonth || !payroll) return [];
+    const basicSalary = Number(payroll.basic_salary || 0);
+    const ssnitNumber = String(profile?.ssnit_number || '').trim();
+    const ssnitDeduction = ssnitNumber ? Number((basicSalary * SSNIT_EMPLOYEE_RATE).toFixed(2)) : 0;
+    const paye = calculatePayeMonthly(basicSalary);
     const loanDue = loanRepayments.filter((row) => monthKey(row.repayment_month) === selectedMonth).reduce((sum, row) => sum + Number(row.scheduled_amount || 0), 0);
     const creditUnion = creditUnionRows.filter((row) => monthKey(row.contribution_month) === selectedMonth).reduce((sum, row) => sum + Number(row.amount || 0), 0);
     const attendance = attendanceDeductions.filter((row) => monthKey(row.work_date) === selectedMonth).reduce((sum, row) => sum + Number(row.amount || 0), 0);
     const lines: PayslipDeductionLine[] = [];
+    if (ssnitDeduction > 0) lines.push({ label: `SSNIT Employee Deduction (${ssnitNumber})`, amount: ssnitDeduction, note: '5.5% calculated on basic salary because SSNIT number is on file.' });
+    lines.push({ label: 'PAYE Tax', amount: paye, note: 'Calculated on basic salary only using the monthly PAYE schedule.' });
     if (loanDue > 0) lines.push({ label: 'Staff Loan Repayment', amount: loanDue, note: 'Scheduled loan repayment for this payslip month.' });
     if (creditUnion > 0) lines.push({ label: 'Credit Union Contribution', amount: creditUnion, note: 'Credit union shares/contribution for this payslip month.' });
     if (attendance > 0) lines.push({ label: 'Attendance Deductions', amount: attendance, note: 'Approved attendance deduction(s) for this month.' });
     return lines;
-  }, [selectedMonth, loanRepayments, creditUnionRows, attendanceDeductions]);
+  }, [selectedMonth, payroll, profile?.ssnit_number, loanRepayments, creditUnionRows, attendanceDeductions]);
 
   const totalAutomaticDeductions = payslipDeductionLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
   const totalPayslipDeductions = Number(payroll?.deductions || 0) + totalAutomaticDeductions;
@@ -115,7 +144,7 @@ export function Documents() {
         {approvedRequest ? <><div className="approval-card approved"><strong>Approved</strong><span>Position: {approvedRequest.position || profile?.position || '-'}</span><span>Monthly salary: {approvedRequest.monthly_salary ? `GHS ${Number(approvedRequest.monthly_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'As approved by management'}</span></div><button className="primary" onClick={downloadAppointmentLetter}>Download Generated Appointment Letter PDF</button></> : pendingRequest ? <div className="approval-card pending"><strong>Pending admin approval</strong><span>Requested on {new Date(pendingRequest.requested_at).toLocaleDateString()}.</span></div> : <><button className="primary" disabled={requestBusy} onClick={requestAppointmentLetter}>{requestBusy ? 'Sending request...' : 'Request Admin Approval'}</button>{latestRequest?.status === 'rejected' && <div className="approval-card rejected"><strong>Previous request rejected</strong><span>{latestRequest.admin_notes || 'No reason was added by admin.'}</span></div>}</>}
       </div>
       <div className="panel form-grid"><h2>Employee Binding Agreement</h2><p className="muted">Every new entrant should sign this agreement covering Mezzo House knowledge, methods, intellectual property and confidentiality.</p>{bindingRecord ? <div className="approval-card approved"><strong>Signed</strong><span>Signed as {bindingRecord.signed_name}</span><span>{new Date(bindingRecord.signed_at).toLocaleString()}</span><button className="primary" onClick={() => profile && generateBindingAgreement(profile, bindingRecord.signed_name)}>Download Signed Copy</button></div> : <><label>Type your full name as signature<input value={signatureName} onChange={(e) => setSignatureName(e.target.value)} placeholder={profile?.full_name || 'Full name'} /></label><button className="primary" onClick={signBindingAgreement}>Sign and Download Agreement</button></>}</div>
-      <div className="panel form-grid"><h2>Monthly Payslip</h2>{payrolls.length === 0 ? <p className="muted">No payslip has been uploaded for your account yet.</p> : <><label>Month<select value={selectedPayroll} onChange={(e) => setSelectedPayroll(e.target.value)}>{payrolls.map((row) => <option key={row.id} value={row.id}>{new Date(row.month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</option>)}</select></label>{payroll && <div className="approval-card approved"><strong>Payslip Deduction Preview</strong><span>Salary/allowances: {money(Number(payroll.basic_salary || 0) + Number(payroll.allowances || 0))}</span>{Number(payroll.deductions || 0) > 0 && <span>Other deductions: {money(payroll.deductions)}</span>}{payslipDeductionLines.map((line) => <span key={line.label}>{line.label}: {money(line.amount)}</span>)}<span>Total deductions: {money(totalPayslipDeductions)}</span><span>Net pay after deductions: {money(netPay)}</span></div>}<button className="primary" onClick={() => profile && payroll && generatePayslip(profile, payroll, payslipDeductionLines)}>Generate Payslip PDF</button></>}</div>
+      <div className="panel form-grid"><h2>Monthly Payslip</h2>{payrolls.length === 0 ? <p className="muted">No payslip has been uploaded for your account yet.</p> : <><label>Month<select value={selectedPayroll} onChange={(e) => setSelectedPayroll(e.target.value)}>{payrolls.map((row) => <option key={row.id} value={row.id}>{new Date(row.month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</option>)}</select></label>{payroll && <div className="approval-card approved"><strong>Payslip Deduction Preview</strong><span>Basic salary: {money(payroll.basic_salary)}</span><span>Allowances: {money(payroll.allowances)}</span>{Number(payroll.deductions || 0) > 0 && <span>Other deductions: {money(payroll.deductions)}</span>}{payslipDeductionLines.map((line) => <span key={line.label}>{line.label}: {money(line.amount)}</span>)}<span>Total deductions: {money(totalPayslipDeductions)}</span><span>Net pay after deductions: {money(netPay)}</span><span className="muted">PAYE is calculated on basic salary only. SSNIT shows only when a SSNIT number is saved in My Details.</span></div>}<button className="primary" onClick={() => profile && payroll && generatePayslip(profile, payroll, payslipDeductionLines)}>Generate Payslip PDF</button></>}</div>
     </div>
   </section>;
 }
