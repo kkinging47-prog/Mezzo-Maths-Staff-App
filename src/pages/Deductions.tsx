@@ -11,6 +11,8 @@ function today() { return new Date().toISOString().slice(0, 10); }
 function weekStart() { const d = new Date(); const day = d.getDay() || 7; d.setDate(d.getDate() - day + 1); return d.toISOString().slice(0, 10); }
 function monthStart() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }
 
+const deductionSelect = '*, staff:profiles!attendance_deductions_staff_id_fkey(full_name,email,position), schools(name)';
+
 export function Deductions() {
   const { profile } = useAuth();
   const [deductions, setDeductions] = useState<any[]>([]);
@@ -25,7 +27,7 @@ export function Deductions() {
 
   async function load() {
     if (!profile) return;
-    let query = supabase.from('attendance_deductions').select('*, profiles(full_name,email,position), schools(name)').order('work_date', { ascending: false }).order('created_at', { ascending: false }).limit(300);
+    let query = supabase.from('attendance_deductions').select(deductionSelect).order('work_date', { ascending: false }).order('created_at', { ascending: false }).limit(300);
     if (!canViewAll) query = query.eq('staff_id', profile.id);
     const { data, error } = await query;
     if (error) setMessage(error.message); else setDeductions(data || []);
@@ -65,7 +67,7 @@ export function Deductions() {
   function exportCsv() {
     downloadCsv('attendance-deductions.csv', deductions.map((row) => ({
       date: row.work_date,
-      staff: row.profiles?.full_name || row.profiles?.email,
+      staff: row.staff?.full_name || row.staff?.email,
       school: row.schools?.name,
       amount: row.amount,
       status: row.status,
@@ -88,12 +90,12 @@ export function Deductions() {
 
     {canReview && <form className="panel form-grid" onSubmit={runCheck}>
       <h2>Run Defaulter Check</h2>
-      <p className="hint">The system can also run automatically with Supabase Cron. This button lets admin manually check any date.</p>
+      <p className="hint">This checks the selected date and creates pending deductions only for staff who missed attendance after their school's reopening date.</p>
       <div className="grid two"><label>Date to check<input type="date" value={checkDate} onChange={(e) => setCheckDate(e.target.value)} required /></label><button className="primary" disabled={busy}>{busy ? 'Checking...' : 'Create Pending Deductions'}</button></div>
     </form>}
 
-    {canReview && <div className="panel"><h2>Admin Notifications: Pending Deductions</h2>{pending.length === 0 && <div className="empty">No pending deductions waiting for approval.</div>}<div className="table-card"><table><thead><tr><th>Date</th><th>Staff</th><th>School</th><th>Amount</th><th>Reason</th><th>Admin Note</th><th>Decision</th></tr></thead><tbody>{pending.map((row) => <tr key={row.id}><td>{row.work_date}</td><td>{row.profiles?.full_name || row.profiles?.email}</td><td>{row.schools?.name || '-'}</td><td>{money(row.amount)}</td><td>{row.reason}</td><td><input value={adminNote[row.id] || ''} onChange={(e) => setAdminNote({ ...adminNote, [row.id]: e.target.value })} placeholder="Optional note" /></td><td><div className="button-row"><button className="primary small-button" disabled={busy} onClick={() => review(row.id, 'approved')}>Approve</button><button className="danger small-button" disabled={busy} onClick={() => review(row.id, 'rejected')}>Reject</button></div></td></tr>)}</tbody></table></div></div>}
+    {canReview && <div className="panel"><h2>Admin Notifications: Pending Deductions</h2>{pending.length === 0 && <div className="empty">No pending deductions waiting for approval.</div>}<div className="table-card"><table><thead><tr><th>Date</th><th>Staff</th><th>School</th><th>Amount</th><th>Reason</th><th>Admin Note</th><th>Decision</th></tr></thead><tbody>{pending.map((row) => <tr key={row.id}><td>{row.work_date}</td><td>{row.staff?.full_name || row.staff?.email}</td><td>{row.schools?.name || '-'}</td><td>{money(row.amount)}</td><td>{row.reason}</td><td><input value={adminNote[row.id] || ''} onChange={(e) => setAdminNote({ ...adminNote, [row.id]: e.target.value })} placeholder="Optional note" /></td><td><div className="button-row"><button className="primary small-button" disabled={busy} onClick={() => review(row.id, 'approved')}>Approve</button><button className="danger small-button" disabled={busy} onClick={() => review(row.id, 'rejected')}>Reject</button></div></td></tr>)}</tbody></table></div></div>}
 
-    <div className="panel"><h2>{canViewAll ? 'All Deduction Records' : 'My Deduction Records'}</h2><div className="table-card"><table><thead><tr><th>Date</th><th>Staff</th><th>School</th><th>Amount</th><th>Status</th><th>Reason</th><th>Admin Note</th></tr></thead><tbody>{deductions.map((row) => <tr key={row.id}><td>{row.work_date}</td><td>{row.profiles?.full_name || row.profiles?.email}</td><td>{row.schools?.name || '-'}</td><td>{money(row.amount)}</td><td><span className={`pill status-${row.status}`}>{row.status}</span></td><td>{row.reason}</td><td>{row.admin_notes || '-'}</td></tr>)}</tbody></table></div>{deductions.length === 0 && <div className="empty">No deduction records found.</div>}</div>
+    <div className="panel"><h2>{canViewAll ? 'All Deduction Records' : 'My Deduction Records'}</h2><div className="table-card"><table><thead><tr><th>Date</th><th>Staff</th><th>School</th><th>Amount</th><th>Status</th><th>Reason</th><th>Admin Note</th></tr></thead><tbody>{deductions.map((row) => <tr key={row.id}><td>{row.work_date}</td><td>{row.staff?.full_name || row.staff?.email}</td><td>{row.schools?.name || '-'}</td><td>{money(row.amount)}</td><td><span className={`pill status-${row.status}`}>{row.status}</span></td><td>{row.reason}</td><td>{row.admin_notes || '-'}</td></tr>)}</tbody></table></div>{deductions.length === 0 && <div className="empty">No deduction records found.</div>}</div>
   </section>;
 }
