@@ -190,23 +190,40 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   max-width: 100%;
 }
 
-/* Payroll/admin form: keep fields balanced and stop the allowances box from overflowing. */
-.payroll-panel {
+.payroll-panel,
+.payroll-control-panel,
+.payroll-draft-panel {
   grid-column: 1 / -1;
+}
+
+.payroll-panel {
   max-width: 980px;
 }
 
-.payroll-form-grid {
+.payroll-control-panel,
+.payroll-draft-panel {
+  max-width: 100%;
+}
+
+.payroll-form-grid,
+.payroll-controls-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 16px 24px;
   width: 100%;
   max-width: 920px;
 }
 
+.payroll-form-grid {
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+}
+
 .payroll-form-grid label,
 .payroll-form-grid input,
-.payroll-form-grid select {
+.payroll-form-grid select,
+.payroll-controls-grid label,
+.payroll-controls-grid input,
+.payroll-controls-grid select {
   width: 100%;
   min-width: 0;
 }
@@ -220,7 +237,15 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   max-width: 920px;
 }
 
-/* Catch common admin and report sections before they turn into very wide strips. */
+.payroll-table-card table {
+  min-width: 1120px;
+}
+
+.payroll-table-card input[type="number"],
+.payroll-table-card input[type="date"] {
+  min-width: 120px;
+}
+
 .approval-form-grid,
 .supervisor-filter,
 .share-row,
@@ -264,12 +289,16 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   .grid.two,
   .grid.three,
   .grid.four,
-  .payroll-form-grid {
+  .payroll-form-grid,
+  .payroll-controls-grid {
     grid-template-columns: 1fr;
   }
 
   .payroll-panel,
+  .payroll-control-panel,
+  .payroll-draft-panel,
   .payroll-form-grid,
+  .payroll-controls-grid,
   .payroll-preview-card,
   .form-grid > label,
   .form-grid > .grid,
@@ -314,6 +343,10 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   .compact-table table {
     min-width: 680px;
   }
+
+  .payroll-table-card table {
+    min-width: 1040px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -341,5 +374,9 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   .table-card table,
   .compact-table table {
     min-width: 620px;
+  }
+
+  .payroll-table-card table {
+    min-width: 980px;
   }
 }
