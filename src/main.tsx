@@ -26,6 +26,7 @@ import { CreditUnion } from './pages/CreditUnion';
 import { PayrollAdmin } from './pages/PayrollAdmin';
 import { FinanceAdmin } from './pages/FinanceAdmin';
 import { FinanceAccess } from './pages/FinanceAccess';
+import { FileAnalyzer } from './pages/FileAnalyzer';
 import { SchoolSettings } from './pages/SchoolSettings';
 import { WorkbookOrders } from './pages/WorkbookOrders';
 import { ReportSummary } from './pages/ReportSummary';
@@ -61,6 +62,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/payroll" element={<ProtectedRoute adminOnly><PayrollAdmin /></ProtectedRoute>} />
             <Route path="/finance-admin" element={<FinanceProtected><FinanceAdmin /></FinanceProtected>} />
             <Route path="/finance-access" element={<ProtectedRoute adminOnly><FinanceAccess /></ProtectedRoute>} />
+            <Route path="/file-analyzer" element={<ProtectedRoute adminOnly><FileAnalyzer /></ProtectedRoute>} />
             <Route path="/school-settings" element={<ProtectedRoute adminOnly><SchoolSettings /></ProtectedRoute>} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/meetings" element={<Meetings />} />
