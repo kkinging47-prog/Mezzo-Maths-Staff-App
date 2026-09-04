@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { AlertTriangle, BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, CreditCard, FileSignature, FileText, Home, Landmark, LogOut, Mail, MapPin, Megaphone, MessageSquare, Settings, ShieldCheck, UserCog, Users, Video, Wallet } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, BookOpen, CalendarCheck, ClipboardCheck, Clock3, CreditCard, FileSearch, FileSignature, FileText, Home, Landmark, LogOut, Mail, MapPin, Megaphone, MessageSquare, Settings, ShieldCheck, UserCog, Users, Video, Wallet } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { CompanyLogo } from './CompanyLogo';
@@ -53,6 +53,7 @@ export function Nav() {
         <NavLink to="/documents" className={itemClass}><MessageSquare size={18}/> Letters & Payslip</NavLink>
         <NavLink to="/meetings" className={itemClass}><Video size={18}/> Meetings</NavLink>
         {canOpenFinance && <NavLink to="/finance-admin" className={itemClass}><Landmark size={18}/> Finance Admin</NavLink>}
+        {isAdmin && <NavLink to="/file-analyzer" className={itemClass}><FileSearch size={18}/> File Analyzer</NavLink>}
         {isAdmin && <NavLink to="/finance-access" className={itemClass}><ShieldCheck size={18}/> Finance Users</NavLink>}
         {isAdmin && <NavLink to="/payroll" className={itemClass}><CreditCard size={18}/> Payroll</NavLink>}
         {isAdmin && <NavLink to="/report-summary" className={itemClass}><BarChart3 size={18}/> Report Summary</NavLink>}
