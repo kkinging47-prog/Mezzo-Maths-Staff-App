@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { AttendanceRecord, School } from '../types';
 
 function isSupervisor(position?: string | null) { return String(position || '').toLowerCase().includes('supervisor'); }
+function schoolHasGps(school?: School | null) { return school?.latitude !== null && school?.latitude !== undefined && school?.longitude !== null && school?.longitude !== undefined; }
 
 export function QuickAttendance() {
   const { profile } = useAuth();
@@ -41,19 +42,33 @@ export function QuickAttendance() {
     return path;
   }
 
+  async function saveMissingSchoolGps(school: School, latitude: number, longitude: number) {
+    if (schoolHasGps(school)) return;
+    const { error } = await supabase.from('schools').update({ latitude, longitude, updated_at: new Date().toISOString() }).eq('id', school.id).is('latitude', null).is('longitude', null);
+    if (error) throw error;
+  }
+
   async function checkIn() {
     if (!profile || !selectedSchool) return;
     if (!selfie) { setType('error'); setMessage('Please take your photo before checking in.'); return; }
     setBusy(true); setMessage('');
     try {
       const position = await getCurrentPosition();
-      const distance = distanceInMeters(position.latitude, position.longitude, selectedSchool.latitude, selectedSchool.longitude);
-      const radius = selectedSchool.radius_m || Number(import.meta.env.VITE_ATTENDANCE_RADIUS_M || 100);
-      if (distance > radius) { setType('error'); setMessage(`You are about ${distance}m from ${selectedSchool.name}. You must be within ${radius}m to check in.`); return; }
+      const missingGps = !schoolHasGps(selectedSchool);
+      let distance = 0;
+      if (missingGps) {
+        await saveMissingSchoolGps(selectedSchool, position.latitude, position.longitude);
+      } else {
+        distance = distanceInMeters(position.latitude, position.longitude, Number(selectedSchool.latitude), Number(selectedSchool.longitude));
+        const radius = selectedSchool.radius_m || Number(import.meta.env.VITE_ATTENDANCE_RADIUS_M || 100);
+        if (distance > radius) { setType('error'); setMessage(`You are about ${distance}m from ${selectedSchool.name}. You must be within ${radius}m to check in.`); return; }
+      }
       const selfieUrl = await uploadSelfie(selfie, profile.id);
       const { error } = await supabase.from('attendance').insert({ staff_id: profile.id, school_id: selectedSchool.id, work_date: todayGhanaDate(), check_in_lat: position.latitude, check_in_lng: position.longitude, check_in_distance_m: distance, selfie_url: selfieUrl, status: 'checked_in' });
       if (error) throw error;
-      setType('success'); setMessage(`Checked in successfully at ${selectedSchool.name}.`); await loadData();
+      setType('success');
+      setMessage(missingGps ? `Checked in successfully at ${selectedSchool.name}. This school's GPS location has also been saved from your current location.` : `Checked in successfully at ${selectedSchool.name}.`);
+      await loadData();
     } catch (error: any) { setType('error'); setMessage(error.message || 'Check-in failed.'); }
     finally { setBusy(false); }
   }
@@ -66,5 +81,5 @@ export function QuickAttendance() {
     if (error) { setType('error'); setMessage(error.message); } else { setType('success'); setMessage('Checked out successfully.'); await loadData(); }
   }
 
-  return <div className="panel form-grid quick-attendance"><h2>Quick Attendance</h2><StatusMessage message={message} type={type} />{openRecord ? <><p>You are checked in at <strong>{openRecord.schools?.name || 'school'}</strong>.</p><button className="danger" disabled={busy} onClick={checkOut}>{busy ? 'Working...' : 'Check out now'}</button></> : <><label>School<select value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}</select></label>{schools.length === 0 && <p className="warning">No school has been assigned to your account yet.</p>}<CameraCapture onCapture={(file) => setSelfie(file)} /><button className="primary" disabled={busy || schools.length === 0} onClick={checkIn}>{busy ? 'Checking...' : 'Check in now'}</button></>}</div>;
+  return <div className="panel form-grid quick-attendance"><h2>Quick Attendance</h2><StatusMessage message={message} type={type} />{openRecord ? <><p>You are checked in at <strong>{openRecord.schools?.name || 'school'}</strong>.</p><button className="danger" disabled={busy} onClick={checkOut}>{busy ? 'Working...' : 'Check out now'}</button></> : <><label>School<select value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}</select></label>{schools.length === 0 && <p className="warning">No school has been assigned to your account yet.</p>}{selectedSchool && !schoolHasGps(selectedSchool) && <p className="status info">This school has no saved GPS yet. Your check-in location will be used to set it.</p>}<CameraCapture onCapture={(file) => setSelfie(file)} /><button className="primary" disabled={busy || schools.length === 0} onClick={checkIn}>{busy ? 'Checking...' : 'Check in now'}</button></>}</div>;
 }
