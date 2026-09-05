@@ -27,9 +27,9 @@ export interface School {
   id: string;
   name: string;
   address?: string | null;
-  latitude: number;
-  longitude: number;
-  radius_m: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  radius_m?: number | null;
 }
 
 export interface AttendanceRecord {
