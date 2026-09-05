@@ -1,143 +1,135 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { CheckCircle, X } from 'lucide-react';
-import { StatusMessage } from '../components/StatusMessage';
 import { AdminStaffManager } from '../components/AdminStaffManager';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { dataUrlToFile, generateBirthdayCardImage } from '../lib/birthdayCard';
 import { AppointmentLetterRequest, Profile, School } from '../types';
 
-type AdminTab = 'actions' | 'staff' | 'approvals' | 'birthdays';
-type ToastType = 'info' | 'success' | 'error';
-type AssignmentRow = { staff_id: string; school_id: string; schools?: Pick<School, 'id' | 'name'> | null };
-type ApprovalForm = { appointment_date: string; position: string; monthly_salary: string; admin_notes: string };
+type Tab = 'quick' | 'staff' | 'appointments';
+type Assignment = { staff_id: string; school_id: string; schools?: Pick<School, 'id' | 'name' | 'address'> | null };
+type Popup = { message: string; type: 'success' | 'error' | 'info' } | null;
 
-const birthdayMessage = 'Today marks a very special day in your life. We join you to celebrate this day and we pray that the Lord will bless you and keep you in health, strength and prosperity. We all wish you a happy birthday and we say God bless you.';
-const emptyApproval: ApprovalForm = { appointment_date: '', position: 'Mezzo Maths Tutor', monthly_salary: '', admin_notes: '' };
-const emptySchool = { name: '', address: '', latitude: '', longitude: '', radius_m: '100' };
-const emptyPost = { title: '', body: '', priority: 'normal' };
-const emptyMeeting = { title: '', room_name: '', scheduled_at: '', description: '' };
-
-function dateOnly(value?: string | null) { return value && value.length >= 10 ? value.slice(0, 10) : ''; }
-function money(value: number | string | null | undefined) { return `GHS ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
+function staffLabel(row: Profile) {
+  return [row.full_name, row.staff_no, row.email, row.position].filter(Boolean).join(' · ') || row.id;
+}
+function normalize(value: string) { return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
 function prettyDate(value?: string | null) { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : '-'; }
-function birthdayDate(dateOfBirth?: string | null) { const d = dateOfBirth ? new Date(dateOfBirth) : null; if (!d || Number.isNaN(d.getTime())) return ''; return `${new Date().getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`; }
-function safeName(value: string) { return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'birthday-card'; }
-function staffLabel(row: Profile) { return [row.full_name, row.staff_no, row.email, row.position].filter(Boolean).join(' · ') || row.id; }
+function money(value: number | string | null | undefined) { return `GHS ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
+
+function AdminPopup({ popup, onClose }: { popup: Popup; onClose: () => void }) {
+  if (!popup) return null;
+  return <div className={`admin-popup ${popup.type}`} role="status"><div><strong>{popup.type === 'error' ? 'Action failed' : popup.type === 'success' ? 'Done' : 'Notice'}</strong><p>{popup.message}</p></div><button type="button" onClick={onClose}>Close</button></div>;
+}
 
 export function Admin() {
   const { profile } = useAuth();
-  const [tab, setTab] = useState<AdminTab>('actions');
-  const [message, setMessage] = useState('');
-  const [type, setType] = useState<ToastType>('info');
-  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<Tab>('quick');
   const [staff, setStaff] = useState<Profile[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [requests, setRequests] = useState<AppointmentLetterRequest[]>([]);
-  const [approvalForms, setApprovalForms] = useState<Record<string, ApprovalForm>>({});
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
-  const [schoolForm, setSchoolForm] = useState(emptySchool);
-  const [postForm, setPostForm] = useState(emptyPost);
-  const [meetingForm, setMeetingForm] = useState(emptyMeeting);
-  const [birthdayPreview, setBirthdayPreview] = useState('');
-  const [birthdayBusy, setBirthdayBusy] = useState(false);
-  const [birthdayForm, setBirthdayForm] = useState({ staff_id: '', display_name: '', position: 'Mezzo Maths Tutor', birthday_date: '', message: birthdayMessage });
+  const [staffSearch, setStaffSearch] = useState('');
+  const [postForm, setPostForm] = useState({ title: '', body: '', priority: 'normal' });
+  const [meetingForm, setMeetingForm] = useState({ title: '', room_name: '', scheduled_at: '', description: '' });
+  const [schoolForm, setSchoolForm] = useState({ name: '', address: '', latitude: '', longitude: '', radius_m: '100' });
+  const [loading, setLoading] = useState(false);
+  const [popup, setPopup] = useState<Popup>(null);
+  const [appointmentsLoaded, setAppointmentsLoaded] = useState(false);
 
-  function show(text: string, nextType: ToastType = 'success') {
-    setType(nextType); setMessage(text); setToast({ message: text, type: nextType });
-    window.setTimeout(() => setToast(null), 4500);
-  }
+  function show(message: string, type: 'success' | 'error' | 'info' = 'success') { setPopup({ message, type }); window.setTimeout(() => setPopup(null), 5000); }
   function fail(error: any) { show(error?.message || 'Action failed.', 'error'); }
 
   async function loadCoreData() {
+    setLoading(true);
     const [{ data: profileData, error: profileError }, { data: schoolData, error: schoolError }, { data: assignmentData, error: assignmentError }] = await Promise.all([
-      supabase.from('profiles').select('*').order('full_name'),
+      supabase.from('profiles').select('id,role,staff_no,full_name,email,phone,position,department,status,photo_url,date_employed,date_of_birth,ssnit_number').order('full_name'),
       supabase.from('schools').select('*').order('name'),
-      supabase.from('staff_school_assignments').select('staff_id, school_id, schools(id,name)').order('staff_id'),
+      supabase.from('staff_school_assignments').select('staff_id,school_id,schools(id,name,address)').order('staff_id'),
     ]);
+    setLoading(false);
     if (profileError || schoolError || assignmentError) { fail(profileError || schoolError || assignmentError); return; }
-    const profiles = (profileData || []) as Profile[];
+    const profileRows = (profileData || []) as Profile[];
     const schoolRows = (schoolData || []) as School[];
-    setStaff(profiles); setSchools(schoolRows); setAssignments((assignmentData || []) as AssignmentRow[]);
-    setSelectedStaffId((prev) => prev || profiles.find((item) => item.role !== 'admin')?.id || profiles[0]?.id || '');
-    setSelectedSchoolId((prev) => prev || schoolRows[0]?.id || '');
-    setBirthdayForm((prev) => ({ ...prev, staff_id: prev.staff_id || profiles.find((item) => item.role !== 'admin')?.id || profiles[0]?.id || '' }));
+    setStaff(profileRows); setSchools(schoolRows); setAssignments((assignmentData || []) as Assignment[]);
+    if (!selectedStaffId && profileRows[0]) setSelectedStaffId(profileRows[0].id);
+    if (!selectedSchoolId && schoolRows[0]) setSelectedSchoolId(schoolRows[0].id);
   }
 
-  async function loadRequests() {
-    const { data, error } = await supabase.from('appointment_letter_requests').select('*').order('requested_at', { ascending: false });
+  async function loadAppointments() {
+    setLoading(true);
+    const { data, error } = await supabase.from('appointment_letter_requests').select('*').order('requested_at', { ascending: false }).limit(100);
+    setLoading(false);
     if (error) { fail(error); return; }
-    const rows = (data || []) as AppointmentLetterRequest[];
-    setRequests(rows);
-    setApprovalForms((previous) => {
-      const next = { ...previous };
-      rows.forEach((request) => {
-        const person = staff.find((row) => row.id === request.staff_id);
-        if (!next[request.id]) next[request.id] = { appointment_date: dateOnly(request.appointment_date) || dateOnly(person?.date_employed), position: request.position || person?.position || 'Mezzo Maths Tutor', monthly_salary: request.monthly_salary ? String(request.monthly_salary) : '', admin_notes: request.admin_notes || '' };
-      });
-      return next;
-    });
+    setRequests((data || []) as AppointmentLetterRequest[]); setAppointmentsLoaded(true);
   }
 
   useEffect(() => { loadCoreData(); }, []);
-  useEffect(() => { if (tab === 'approvals') loadRequests(); }, [tab, staff.length]);
-  useEffect(() => { const person = staff.find((row) => row.id === birthdayForm.staff_id); if (!person) return; setBirthdayForm((prev) => ({ ...prev, display_name: person.full_name || person.email || prev.display_name, position: person.position || prev.position, birthday_date: birthdayDate(person.date_of_birth) || prev.birthday_date })); setBirthdayPreview(''); }, [birthdayForm.staff_id, staff]);
+  useEffect(() => { if (tab === 'appointments' && !appointmentsLoaded) loadAppointments(); }, [tab, appointmentsLoaded]);
 
-  const staffOptions = useMemo(() => staff.filter((row) => row.role !== 'admin').map((row) => ({ value: row.id, label: staffLabel(row) })), [staff]);
-  const selectedStaff = staff.find((row) => row.id === selectedStaffId);
-  const selectedSchool = schools.find((row) => row.id === selectedSchoolId);
+  const staffOptions = useMemo(() => {
+    const query = normalize(staffSearch);
+    const rows = query ? staff.filter((row) => normalize(staffLabel(row)).includes(query)) : staff;
+    return rows.slice(0, 250).map((row) => ({ value: row.id, label: staffLabel(row) }));
+  }, [staff, staffSearch]);
+  const selectedStaff = useMemo(() => staff.find((row) => row.id === selectedStaffId), [staff, selectedStaffId]);
+  const selectedSchool = useMemo(() => schools.find((row) => row.id === selectedSchoolId), [schools, selectedSchoolId]);
   const selectedAssignments = useMemo(() => assignments.filter((row) => row.staff_id === selectedStaffId), [assignments, selectedStaffId]);
-  const selectedSchoolAlreadyAssigned = selectedAssignments.some((row) => row.school_id === selectedSchoolId);
-  const pendingCount = requests.filter((row) => row.status === 'pending').length;
-
-  async function notifyStaff(staffId: string, title: string, body: string) { await supabase.from('notifications').insert({ user_id: staffId, title, body }); }
+  const alreadyAssigned = selectedAssignments.some((row) => row.school_id === selectedSchoolId);
 
   async function createSchool(event: FormEvent) {
     event.preventDefault();
-    if (!schoolForm.name.trim()) return fail(new Error('School name is required.'));
-    setBusy(true);
-    try {
-      const { error } = await supabase.from('schools').insert({ name: schoolForm.name.trim(), address: schoolForm.address.trim() || null, latitude: schoolForm.latitude.trim() ? Number(schoolForm.latitude) : null, longitude: schoolForm.longitude.trim() ? Number(schoolForm.longitude) : null, radius_m: Number(schoolForm.radius_m || 100) });
-      if (error) throw error;
-      setSchoolForm(emptySchool); await loadCoreData(); show('School saved successfully.');
-    } catch (error: any) { fail(error); } finally { setBusy(false); }
+    const name = schoolForm.name.trim();
+    if (!name) return show('School name is required.', 'error');
+    const { error } = await supabase.from('schools').insert({ name, address: schoolForm.address.trim() || null, latitude: schoolForm.latitude.trim() ? Number(schoolForm.latitude) : null, longitude: schoolForm.longitude.trim() ? Number(schoolForm.longitude) : null, radius_m: Number(schoolForm.radius_m || 100) });
+    if (error) return fail(error);
+    setSchoolForm({ name: '', address: '', latitude: '', longitude: '', radius_m: '100' });
+    show('School saved successfully.'); await loadCoreData();
   }
 
   async function assignSchool(event: FormEvent) {
     event.preventDefault();
     if (!profile) return;
-    if (!selectedStaffId || !selectedSchoolId) return fail(new Error('Select both teacher and school.'));
-    if (selectedSchoolAlreadyAssigned) return show(`${selectedStaff?.full_name || 'This teacher'} is already assigned to ${selectedSchool?.name || 'this school'}.`, 'info');
-    setBusy(true);
-    try {
-      const { data: existing, error: existingError } = await supabase.from('staff_school_assignments').select('staff_id, school_id').eq('staff_id', selectedStaffId).eq('school_id', selectedSchoolId).maybeSingle();
-      if (existingError) throw existingError;
-      if (existing) { await loadCoreData(); return show(`${selectedStaff?.full_name || 'This teacher'} is already assigned to ${selectedSchool?.name || 'this school'}.`, 'info'); }
-      const { error } = await supabase.from('staff_school_assignments').insert({ staff_id: selectedStaffId, school_id: selectedSchoolId, assigned_by: profile.id });
-      if (error) throw error;
-      await loadCoreData(); show(`${selectedStaff?.full_name || 'Teacher'} assigned to ${selectedSchool?.name || 'school'} successfully.`);
-    } catch (error: any) { fail(error); } finally { setBusy(false); }
+    if (!selectedStaffId || !selectedSchoolId) return show('Select both teacher and school.', 'error');
+    if (alreadyAssigned) return show('This teacher is already assigned to the selected school. Choose another school.', 'info');
+    const { error } = await supabase.from('staff_school_assignments').insert({ staff_id: selectedStaffId, school_id: selectedSchoolId, assigned_by: profile.id });
+    if (error) return fail(error);
+    show(`${selectedStaff?.full_name || 'Teacher'} assigned to ${selectedSchool?.name || 'school'} successfully.`); await loadCoreData();
   }
 
-  async function createPost(event: FormEvent) { event.preventDefault(); if (!profile) return; setBusy(true); try { const { error } = await supabase.from('company_posts').insert({ ...postForm, post_type: 'update', author_id: profile.id }); if (error) throw error; setPostForm(emptyPost); show('Company update posted successfully.'); } catch (error: any) { fail(error); } finally { setBusy(false); } }
-  async function createMeeting(event: FormEvent) { event.preventDefault(); if (!profile) return; setBusy(true); try { const cleanRoom = meetingForm.room_name || `mezzo-${Date.now()}`; const { error } = await supabase.from('meetings').insert({ ...meetingForm, room_name: cleanRoom.replace(/\s+/g, '-'), created_by: profile.id, scheduled_at: meetingForm.scheduled_at || null }); if (error) throw error; setMeetingForm(emptyMeeting); show('Meeting created successfully.'); } catch (error: any) { fail(error); } finally { setBusy(false); } }
-  function setApproval(id: string, patch: Partial<ApprovalForm>) { setApprovalForms((prev) => ({ ...prev, [id]: { ...(prev[id] || emptyApproval), ...patch } })); }
-  async function approveRequest(request: AppointmentLetterRequest) { if (!profile) return; const form = approvalForms[request.id] || emptyApproval; if (!form.appointment_date || !form.position || !form.monthly_salary || Number(form.monthly_salary) <= 0) return fail(new Error('Add effective date, position and monthly salary before approval.')); setBusy(true); try { const { error } = await supabase.from('appointment_letter_requests').update({ status: 'approved', decided_by: profile.id, decided_at: new Date().toISOString(), appointment_date: form.appointment_date, position: form.position, monthly_salary: Number(form.monthly_salary), admin_notes: form.admin_notes || null }).eq('id', request.id); if (error) throw error; await notifyStaff(request.staff_id, 'Appointment letter approved', 'Your appointment letter has been approved. Open Letters & Payslips to download it.'); await loadRequests(); show('Appointment letter approved.'); } catch (error: any) { fail(error); } finally { setBusy(false); } }
-  async function rejectRequest(request: AppointmentLetterRequest) { if (!profile) return; const form = approvalForms[request.id] || emptyApproval; setBusy(true); try { const { error } = await supabase.from('appointment_letter_requests').update({ status: 'rejected', decided_by: profile.id, decided_at: new Date().toISOString(), admin_notes: form.admin_notes || 'Please contact admin for more details.' }).eq('id', request.id); if (error) throw error; await notifyStaff(request.staff_id, 'Appointment letter request rejected', form.admin_notes || 'Your appointment letter request was not approved. Please contact admin.'); await loadRequests(); show('Appointment letter request rejected.'); } catch (error: any) { fail(error); } finally { setBusy(false); } }
-  async function generateBirthdayPreview() { setBirthdayBusy(true); try { const person = staff.find((row) => row.id === birthdayForm.staff_id); const dataUrl = await generateBirthdayCardImage({ staffName: birthdayForm.display_name, position: birthdayForm.position, birthdayDate: birthdayForm.birthday_date, message: birthdayForm.message, photoUrl: person?.photo_url }); setBirthdayPreview(dataUrl); show('Birthday e-card preview generated.'); } catch (error: any) { fail(error); } finally { setBirthdayBusy(false); } }
-  async function createBirthdayPost(event: FormEvent) { event.preventDefault(); if (!profile) return; setBirthdayBusy(true); try { const person = staff.find((row) => row.id === birthdayForm.staff_id); const dataUrl = birthdayPreview || await generateBirthdayCardImage({ staffName: birthdayForm.display_name, position: birthdayForm.position, birthdayDate: birthdayForm.birthday_date, message: birthdayForm.message, photoUrl: person?.photo_url }); const fileName = `${safeName(birthdayForm.display_name)}-${Date.now()}.jpg`; const path = `birthdays/${birthdayForm.staff_id}/${fileName}`; const file = dataUrlToFile(dataUrl, fileName); const { error: uploadError } = await supabase.storage.from('birthday-cards').upload(path, file, { upsert: true, contentType: 'image/jpeg' }); if (uploadError) throw uploadError; const { data } = supabase.storage.from('birthday-cards').getPublicUrl(path); const { error: postError } = await supabase.from('company_posts').insert({ title: `Happy Birthday ${birthdayForm.display_name}`, body: birthdayForm.message, priority: 'important', post_type: 'birthday', image_url: data.publicUrl, image_path: path, author_id: profile.id }); if (postError) throw postError; setBirthdayPreview(data.publicUrl); show('Birthday e-card posted to the dashboard.'); } catch (error: any) { fail(error); } finally { setBirthdayBusy(false); } }
+  async function createPost(event: FormEvent) {
+    event.preventDefault();
+    if (!profile) return;
+    const { error } = await supabase.from('company_posts').insert({ title: postForm.title, body: postForm.body, priority: postForm.priority, post_type: 'update', author_id: profile.id });
+    if (error) return fail(error);
+    setPostForm({ title: '', body: '', priority: 'normal' }); show('Company update posted successfully.');
+  }
+
+  async function createMeeting(event: FormEvent) {
+    event.preventDefault();
+    if (!profile) return;
+    const cleanRoom = (meetingForm.room_name || `mezzo-${Date.now()}`).replace(/\s+/g, '-').toLowerCase();
+    const { error } = await supabase.from('meetings').insert({ title: meetingForm.title, description: meetingForm.description || null, room_name: cleanRoom, scheduled_at: meetingForm.scheduled_at || null, created_by: profile.id, active: true });
+    if (error) return fail(error);
+    setMeetingForm({ title: '', room_name: '', scheduled_at: '', description: '' }); show('Meeting created successfully.');
+  }
+
+  async function decideAppointment(request: AppointmentLetterRequest, status: 'approved' | 'rejected') {
+    if (!profile) return;
+    const { error } = await supabase.from('appointment_letter_requests').update({ status, decided_by: profile.id, decided_at: new Date().toISOString() }).eq('id', request.id);
+    if (error) return fail(error);
+    await supabase.from('notifications').insert({ user_id: request.staff_id, title: status === 'approved' ? 'Appointment letter approved' : 'Appointment letter request rejected', body: status === 'approved' ? 'Your appointment letter has been approved. Open Letters & Payslips to download it.' : 'Your appointment letter request was not approved. Please contact admin.' });
+    show(`Appointment request ${status}.`); await loadAppointments();
+  }
+
+  if (profile?.role !== 'admin') return <div className="empty">This page is for admin only.</div>;
 
   return <section>
-    {toast && <div className={`admin-toast ${toast.type}`}><CheckCircle size={18} /><span>{toast.message}</span><button type="button" onClick={() => setToast(null)}><X size={15} /></button></div>}
-    <div className="page-header"><div><h1>Admin Control</h1><p>Manage staff, school assignments, updates, meetings, appointment approvals and birthday e-cards.</p></div></div>
-    <StatusMessage message={message} type={type} />
-    <div className="chips admin-tabs"><button type="button" className={`chip ${tab === 'actions' ? 'selected' : ''}`} onClick={() => setTab('actions')}>Quick Actions</button><button type="button" className={`chip ${tab === 'staff' ? 'selected' : ''}`} onClick={() => setTab('staff')}>Staff Management</button><button type="button" className={`chip ${tab === 'approvals' ? 'selected' : ''}`} onClick={() => setTab('approvals')}>Appointment Approvals {pendingCount ? `(${pendingCount})` : ''}</button><button type="button" className={`chip ${tab === 'birthdays' ? 'selected' : ''}`} onClick={() => setTab('birthdays')}>Birthday Cards</button></div>
-    {tab === 'staff' && <AdminStaffManager staff={staff} currentUserId={profile?.id} onChanged={loadCoreData} onSuccess={(text) => show(text, 'success')} onError={fail} />}
-    {tab === 'actions' && <div className="grid two"><form className="panel form-grid" onSubmit={assignSchool}><h2>Assign Staff to School</h2><label>Teacher<select value={selectedStaffId} onChange={(e) => setSelectedStaffId(e.target.value)}>{staffOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><div className="assignment-status-card"><strong>{selectedStaff?.full_name || selectedStaff?.email || 'Selected teacher'}</strong>{selectedAssignments.length === 0 ? <p className="status info">This teacher has not been assigned to any school yet.</p> : <p className="status success">Already assigned to: {selectedAssignments.map((row) => row.schools?.name || row.school_id).join(', ')}</p>}</div><label>School<select value={selectedSchoolId} onChange={(e) => setSelectedSchoolId(e.target.value)}>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}</select></label>{selectedSchoolAlreadyAssigned && <p className="status info">This teacher is already assigned to the selected school. Choose another school to add an extra assignment.</p>}<button className="primary" disabled={busy || !selectedStaffId || !selectedSchoolId || selectedSchoolAlreadyAssigned}>{busy ? 'Saving...' : 'Assign School'}</button></form><form className="panel form-grid" onSubmit={createPost}><h2>Post Company Update</h2><label>Title<input value={postForm.title} onChange={(e) => setPostForm({ ...postForm, title: e.target.value })} required /></label><label>Priority<select value={postForm.priority} onChange={(e) => setPostForm({ ...postForm, priority: e.target.value })}><option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option></select></label><label>Message<textarea value={postForm.body} onChange={(e) => setPostForm({ ...postForm, body: e.target.value })} required /></label><button className="primary" disabled={busy}>Post Update</button></form><form className="panel form-grid" onSubmit={createSchool}><h2>Add School Location</h2><label>School Name<input value={schoolForm.name} onChange={(e) => setSchoolForm({ ...schoolForm, name: e.target.value })} required /></label><label>Address<input value={schoolForm.address} onChange={(e) => setSchoolForm({ ...schoolForm, address: e.target.value })} /></label><div className="grid two"><label>Latitude <small className="muted">optional</small><input value={schoolForm.latitude} onChange={(e) => setSchoolForm({ ...schoolForm, latitude: e.target.value })} /></label><label>Longitude <small className="muted">optional</small><input value={schoolForm.longitude} onChange={(e) => setSchoolForm({ ...schoolForm, longitude: e.target.value })} /></label></div><label>Allowed radius in meters<input type="number" value={schoolForm.radius_m} onChange={(e) => setSchoolForm({ ...schoolForm, radius_m: e.target.value })} /></label><button className="primary" disabled={busy}>Save School</button></form><form className="panel form-grid" onSubmit={createMeeting}><h2>Create Meeting</h2><label>Meeting Title<input value={meetingForm.title} onChange={(e) => setMeetingForm({ ...meetingForm, title: e.target.value })} required /></label><label>Room Name<input value={meetingForm.room_name} onChange={(e) => setMeetingForm({ ...meetingForm, room_name: e.target.value })} placeholder="leave blank to auto-generate" /></label><label>Scheduled At<input type="datetime-local" value={meetingForm.scheduled_at} onChange={(e) => setMeetingForm({ ...meetingForm, scheduled_at: e.target.value })} /></label><label>Description<textarea value={meetingForm.description} onChange={(e) => setMeetingForm({ ...meetingForm, description: e.target.value })} /></label><button className="primary" disabled={busy}>Create Meeting</button></form></div>}
-    {tab === 'approvals' && <div className="panel staff-admin-panel"><h2>Appointment Letter Approvals {pendingCount > 0 && <span className="pill">{pendingCount} pending</span>}</h2>{requests.length === 0 ? <div className="empty">No appointment letter requests yet.</div> : <div className="table-card compact-table"><table><thead><tr><th>Staff</th><th>Requested</th><th>Status</th><th>Details</th><th>Action</th></tr></thead><tbody>{requests.map((request) => { const person = staff.find((row) => row.id === request.staff_id); const form = approvalForms[request.id] || emptyApproval; return <tr key={request.id}><td><strong>{person?.full_name || 'Staff Member'}</strong><br /><span className="muted">{person?.email || request.staff_id}</span></td><td>{prettyDate(request.requested_at)}</td><td><span className={`pill request-${request.status}`}>{request.status}</span></td><td>{request.status === 'pending' ? <div className="approval-form-grid"><label>Effective Date<input type="date" value={form.appointment_date} onChange={(e) => setApproval(request.id, { appointment_date: e.target.value })} /></label><label>Position<input value={form.position} onChange={(e) => setApproval(request.id, { position: e.target.value })} /></label><label>Monthly Salary<input type="number" value={form.monthly_salary} onChange={(e) => setApproval(request.id, { monthly_salary: e.target.value })} placeholder="1800" /></label><label>Admin Notes<textarea value={form.admin_notes} onChange={(e) => setApproval(request.id, { admin_notes: e.target.value })} /></label></div> : <div className="approval-summary"><span>Effective date: {request.appointment_date || '-'}</span><span>Position: {request.position || '-'}</span><span>Salary: {request.monthly_salary ? money(request.monthly_salary) : '-'}</span><span>Decision date: {prettyDate(request.decided_at)}</span>{request.admin_notes && <span>Notes: {request.admin_notes}</span>}</div>}</td><td>{request.status === 'pending' ? <div className="button-row"><button type="button" className="primary small-button" disabled={busy} onClick={() => approveRequest(request)}>Approve</button><button type="button" className="danger small-button" disabled={busy} onClick={() => rejectRequest(request)}>Reject</button></div> : <span className="muted">Completed</span>}</td></tr>; })}</tbody></table></div>}</div>}
-    {tab === 'birthdays' && <form className="panel form-grid birthday-admin" onSubmit={createBirthdayPost}><h2>Generate Birthday E-Card</h2><label>Staff<select value={birthdayForm.staff_id} onChange={(e) => setBirthdayForm({ ...birthdayForm, staff_id: e.target.value })}>{staffOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><div className="grid two"><label>Name on Card<input value={birthdayForm.display_name} onChange={(e) => setBirthdayForm({ ...birthdayForm, display_name: e.target.value })} required /></label><label>Position / Role<input value={birthdayForm.position} onChange={(e) => setBirthdayForm({ ...birthdayForm, position: e.target.value })} /></label></div><label>Birthday Date<input type="date" value={birthdayForm.birthday_date} onChange={(e) => setBirthdayForm({ ...birthdayForm, birthday_date: e.target.value })} /></label><label>Birthday Message<textarea value={birthdayForm.message} onChange={(e) => setBirthdayForm({ ...birthdayForm, message: e.target.value })} required /></label><div className="button-row"><button className="primary" type="button" disabled={birthdayBusy} onClick={generateBirthdayPreview}>{birthdayBusy ? 'Working...' : 'Preview Card'}</button><button className="primary" disabled={birthdayBusy}>{birthdayBusy ? 'Posting...' : 'Post to Dashboard'}</button></div>{birthdayPreview && <div className="birthday-preview-card"><img src={birthdayPreview} alt="Generated birthday e-card preview" /><a className="download-link" href={birthdayPreview} download={`${safeName(birthdayForm.display_name)}-birthday-card.jpg`}>Download Card</a></div>}</form>}
+    <AdminPopup popup={popup} onClose={() => setPopup(null)} />
+    <div className="page-header"><div><h1>Admin Control</h1><p>Manage quick admin actions, staff records and appointment approvals.</p></div>{loading && <span className="pill">Loading...</span>}</div>
+    <div className="chips admin-tabs"><button type="button" className={`chip ${tab === 'quick' ? 'selected' : ''}`} onClick={() => setTab('quick')}>Quick Actions</button><button type="button" className={`chip ${tab === 'staff' ? 'selected' : ''}`} onClick={() => setTab('staff')}>Staff Management</button><button type="button" className={`chip ${tab === 'appointments' ? 'selected' : ''}`} onClick={() => setTab('appointments')}>Appointment Approvals</button></div>
+    {tab === 'quick' && <div className="grid two"><form className="panel form-grid" onSubmit={assignSchool}><h2>Assign Staff to School</h2><label>Search Teacher<input value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder="Type name, email, staff number or position" /></label><label>Teacher<select value={selectedStaffId} onChange={(e) => setSelectedStaffId(e.target.value)}>{staffOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><div className="assignment-status-card"><strong>{selectedStaff?.full_name || 'Selected staff'}</strong>{selectedAssignments.length === 0 ? <p>This teacher has not been assigned to any school yet.</p> : <p>Assigned schools: {selectedAssignments.map((row) => row.schools?.name || row.school_id).join(', ')}</p>}</div><label>School<select value={selectedSchoolId} onChange={(e) => setSelectedSchoolId(e.target.value)}>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}</select></label>{alreadyAssigned && <div className="status info">This teacher is already assigned to this school. No duplicate will be created.</div>}<button className="primary" disabled={alreadyAssigned || !selectedStaffId || !selectedSchoolId}>Assign School</button></form><form className="panel form-grid" onSubmit={createPost}><h2>Post Company Update</h2><label>Title<input value={postForm.title} onChange={(e) => setPostForm({ ...postForm, title: e.target.value })} required /></label><label>Priority<select value={postForm.priority} onChange={(e) => setPostForm({ ...postForm, priority: e.target.value })}><option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option></select></label><label>Message<textarea value={postForm.body} onChange={(e) => setPostForm({ ...postForm, body: e.target.value })} required /></label><button className="primary">Post Update</button></form><form className="panel form-grid" onSubmit={createSchool}><h2>Add School</h2><label>School Name<input value={schoolForm.name} onChange={(e) => setSchoolForm({ ...schoolForm, name: e.target.value })} required /></label><label>Address<input value={schoolForm.address} onChange={(e) => setSchoolForm({ ...schoolForm, address: e.target.value })} /></label><div className="grid two"><label>Latitude <small className="muted">optional</small><input value={schoolForm.latitude} onChange={(e) => setSchoolForm({ ...schoolForm, latitude: e.target.value })} /></label><label>Longitude <small className="muted">optional</small><input value={schoolForm.longitude} onChange={(e) => setSchoolForm({ ...schoolForm, longitude: e.target.value })} /></label></div><label>Allowed radius in meters<input type="number" value={schoolForm.radius_m} onChange={(e) => setSchoolForm({ ...schoolForm, radius_m: e.target.value })} /></label><button className="primary">Save School</button></form><form className="panel form-grid" onSubmit={createMeeting}><h2>Create Meeting</h2><label>Meeting Title<input value={meetingForm.title} onChange={(e) => setMeetingForm({ ...meetingForm, title: e.target.value })} required /></label><label>Room Name<input value={meetingForm.room_name} onChange={(e) => setMeetingForm({ ...meetingForm, room_name: e.target.value })} placeholder="Leave blank to auto-generate" /></label><label>Scheduled At<input type="datetime-local" value={meetingForm.scheduled_at} onChange={(e) => setMeetingForm({ ...meetingForm, scheduled_at: e.target.value })} /></label><label>Description<textarea value={meetingForm.description} onChange={(e) => setMeetingForm({ ...meetingForm, description: e.target.value })} /></label><button className="primary">Create Meeting</button></form></div>}
+    {tab === 'staff' && <AdminStaffManager staff={staff} currentUserId={profile?.id} onChanged={loadCoreData} onSuccess={(text) => show(text)} onError={fail} />}
+    {tab === 'appointments' && <div className="panel staff-admin-panel"><h2>Appointment Letter Approvals</h2>{requests.length === 0 ? <div className="empty">No appointment letter requests found.</div> : <div className="table-card compact-table"><table><thead><tr><th>Staff</th><th>Requested</th><th>Status</th><th>Salary</th><th>Action</th></tr></thead><tbody>{requests.map((request) => { const person = staff.find((row) => row.id === request.staff_id); return <tr key={request.id}><td><strong>{person?.full_name || 'Staff Member'}</strong><br /><span className="muted">{person?.email || request.staff_id}</span></td><td>{prettyDate(request.requested_at)}</td><td><span className={`pill request-${request.status}`}>{request.status}</span></td><td>{request.monthly_salary ? money(request.monthly_salary) : '-'}</td><td>{request.status === 'pending' ? <div className="button-row"><button type="button" className="primary small-button" onClick={() => decideAppointment(request, 'approved')}>Approve</button><button type="button" className="danger small-button" onClick={() => decideAppointment(request, 'rejected')}>Reject</button></div> : <span className="muted">Completed</span>}</td></tr>; })}</tbody></table></div>}</div>}
   </section>;
 }
