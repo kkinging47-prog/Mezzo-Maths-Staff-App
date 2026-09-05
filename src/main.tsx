@@ -7,7 +7,6 @@ import { FinanceProtected } from './components/FinanceProtected';
 import { Layout } from './components/Layout';
 import { AppInstallPrompt } from './components/AppInstallPrompt';
 import { RealtimeNotifications } from './components/RealtimeNotifications';
-import { AdminPageEnhancements } from './components/AdminPageEnhancements';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Attendance } from './pages/Attendance';
@@ -44,7 +43,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <AppInstallPrompt />
         <RealtimeNotifications />
-        <AdminPageEnhancements />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
