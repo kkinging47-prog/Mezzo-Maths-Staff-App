@@ -2,7 +2,6 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { School } from '../types';
 
 type SchoolForm = {
   id: string;
@@ -49,6 +48,10 @@ function toForm(school: any): SchoolForm {
 function isReady(school: any) {
   if (!school.reopening_date) return true;
   return new Date(`${school.reopening_date}T00:00:00`).getTime() <= new Date().getTime();
+}
+
+function hasGps(school: any) {
+  return school.latitude !== null && school.latitude !== undefined && school.longitude !== null && school.longitude !== undefined;
 }
 
 export function SchoolSettings() {
@@ -106,13 +109,12 @@ export function SchoolSettings() {
     event.preventDefault();
     if (!profile || profile.role !== 'admin') return;
     if (!form.name.trim()) { setMessage('School name is required.'); return; }
-    if (!form.latitude || !form.longitude) { setMessage('Latitude and longitude are required.'); return; }
     setBusy(true); setMessage('');
     const payload = {
       name: form.name.trim(),
       address: form.address.trim() || null,
-      latitude: Number(form.latitude),
-      longitude: Number(form.longitude),
+      latitude: form.latitude.trim() ? Number(form.latitude) : null,
+      longitude: form.longitude.trim() ? Number(form.longitude) : null,
       radius_m: Number(form.radius_m || 100),
       reopening_date: form.reopening_date || null,
       reopening_note: form.reopening_note.trim() || null,
@@ -123,12 +125,12 @@ export function SchoolSettings() {
       if (form.id) {
         const { error } = await supabase.from('schools').update(payload).eq('id', form.id);
         if (error) throw error;
-        setMessage('School location and reopening date updated successfully.');
+        setMessage('School updated successfully. GPS coordinates can be added now or captured during first staff attendance check-in.');
         await loadSchools(form.id);
       } else {
         const { data, error } = await supabase.from('schools').insert(payload).select('id').single();
         if (error) throw error;
-        setMessage('New school created successfully.');
+        setMessage('New school created successfully. GPS coordinates can be added now or captured during first staff attendance check-in.');
         await loadSchools(data?.id);
       }
     } catch (error: any) {
@@ -139,7 +141,7 @@ export function SchoolSettings() {
   if (profile?.role !== 'admin') return <div className="empty">This page is for admin only.</div>;
 
   return <section>
-    <div className="page-header"><div><h1>School Locations & Reopening Dates</h1><p>Edit school GPS locations, attendance radius, and each school's reopening date.</p></div><button className="primary" onClick={newSchool}>Add New School</button></div>
+    <div className="page-header"><div><h1>School Locations & Reopening Dates</h1><p>Edit school details, GPS locations, attendance radius, and each school's reopening date.</p></div><button className="primary" onClick={newSchool}>Add New School</button></div>
     {message && <div className="status info">{message}</div>}
 
     <div className="grid two">
@@ -150,7 +152,7 @@ export function SchoolSettings() {
           {schools.map((school) => <button key={school.id} type="button" className={`school-row ${selectedId === school.id ? 'active' : ''}`} onClick={() => chooseSchool(school.id)}>
             <strong>{school.name}</strong>
             <span>{school.address || 'No address'} · Radius {school.radius_m || 100}m</span>
-            <em>{school.reopening_date ? `Reopens: ${school.reopening_date}` : 'No reopening date set'} · {isReady(school) ? 'Active for attendance' : 'Not reopened yet'}</em>
+            <em>{school.reopening_date ? `Reopens: ${school.reopening_date}` : 'No reopening date set'} · {hasGps(school) ? 'GPS saved' : 'GPS not set'} · {isReady(school) ? 'Active for attendance' : 'Not reopened yet'}</em>
           </button>)}
           {schools.length === 0 && <div className="empty">No schools have been added yet.</div>}
         </div>
@@ -162,8 +164,8 @@ export function SchoolSettings() {
         <label>School Name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
         <label>Address / Location Description<input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Example: Madina, Accra" /></label>
         <div className="grid two">
-          <label>Latitude<input value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} required /></label>
-          <label>Longitude<input value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} required /></label>
+          <label>Latitude <small className="muted">optional</small><input value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="Can be captured during staff check-in" /></label>
+          <label>Longitude <small className="muted">optional</small><input value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="Can be captured during staff check-in" /></label>
         </div>
         <button type="button" className="small-button" onClick={useMyLocation}><MapPin size={16}/> Use My Current GPS</button>
         <label>Allowed Attendance Radius in Meters<input type="number" min="20" value={form.radius_m} onChange={(e) => setForm({ ...form, radius_m: e.target.value })} /></label>
@@ -175,9 +177,9 @@ export function SchoolSettings() {
     </div>
 
     <div className="panel">
-      <h2>How Different Reopening Dates Work</h2>
-      <p>If a school reopens later than others, set that school's own reopening date here. Attendance deductions should not be created for that school before its reopening date.</p>
-      <p className="hint">Example: School A reopens 2 September, School B reopens 9 September. Set each date separately in the school list.</p>
+      <h2>How Missing GPS Coordinates Work</h2>
+      <p>You can save a school without latitude and longitude. When the first assigned staff member checks in at that school, the app will use the staff member's live GPS position as the school's saved GPS location.</p>
+      <p className="hint">For accuracy, the first staff member should check in while physically standing at the school.</p>
     </div>
   </section>;
 }
