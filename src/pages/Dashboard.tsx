@@ -10,7 +10,8 @@ import { FloatingTeacherPost } from '../components/FloatingTeacherPost';
 import { PostShareButtons } from '../components/PostShareButtons';
 import { DeductionSummary } from '../components/DeductionSummary';
 
-interface ScoreRow { staff_id: string; name: string; present: number; absent: number; score: number; }
+const WEEKLY_REPORT_POINTS = 20;
+interface ScoreRow { staff_id: string; name: string; present: number; absent: number; reports: number; attendancePoints: number; reportPoints: number; score: number; }
 function initials(name?: string | null, email?: string | null) { const source = name || email || 'Staff'; return source.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'S'; }
 
 export function Dashboard() {
@@ -38,17 +39,23 @@ export function Dashboard() {
     setComments(grouped);
   }
   async function loadScoreboard() {
-    const since = new Date(); since.setDate(since.getDate() - 6); const date = since.toISOString().slice(0, 10);
-    const [{ data: profiles }, { data: attendance }] = await Promise.all([
+    const since = new Date();
+    since.setDate(since.getDate() - 6);
+    const date = since.toISOString().slice(0, 10);
+    const [{ data: profiles }, { data: attendance }, { data: reports }] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, status, role').neq('status', 'left').neq('role', 'admin'),
       supabase.from('attendance').select('staff_id, work_date, status').gte('work_date', date),
+      supabase.from('weekly_reports').select('staff_id, week_ending').gte('week_ending', date),
     ]);
     const rows = ((profiles || []) as Profile[]).filter((person) => person.role !== 'admin').map((person) => {
       const records = (attendance || []).filter((row: any) => row.staff_id === person.id);
       const present = new Set(records.filter((row: any) => row.status !== 'absent').map((row: any) => row.work_date)).size;
       const absent = records.filter((row: any) => row.status === 'absent').length;
-      return { staff_id: person.id, name: person.full_name || person.email || 'Staff', present, absent, score: present * 10 - absent * 3 };
-    }).sort((a, b) => b.score - a.score);
+      const reportWeeks = new Set((reports || []).filter((row: any) => row.staff_id === person.id).map((row: any) => row.week_ending)).size;
+      const attendancePoints = present * 10 - absent * 3;
+      const reportPoints = reportWeeks * WEEKLY_REPORT_POINTS;
+      return { staff_id: person.id, name: person.full_name || person.email || 'Staff', present, absent, reports: reportWeeks, attendancePoints, reportPoints, score: attendancePoints + reportPoints };
+    }).sort((a, b) => b.score - a.score || b.reportPoints - a.reportPoints || b.present - a.present);
     setScoreboard(rows);
   }
   async function loadSettings() {
@@ -65,7 +72,7 @@ export function Dashboard() {
   useEffect(() => { loadTimetableStatus(); }, [profile?.id, isAdmin]);
   useEffect(() => { loadComments(posts.map((post) => post.id)); }, [posts]);
   useEffect(() => {
-    const channel = supabase.channel('company-dashboard-feed').on('postgres_changes', { event: '*', schema: 'public', table: 'company_posts' }, loadPosts).on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, loadPosts).subscribe();
+    const channel = supabase.channel('company-dashboard-feed').on('postgres_changes', { event: '*', schema: 'public', table: 'company_posts' }, loadPosts).on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, loadPosts).on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_reports' }, loadScoreboard).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
   async function submitComment(event: FormEvent, postId: string) {
@@ -91,7 +98,7 @@ export function Dashboard() {
     <div className="grid two">{!isAdmin && <QuickAttendance />}<div className="panel dashboard-profile-card">{profile?.photo_url ? <img className="staff-avatar" src={profile.photo_url} alt="Staff profile" /> : <div className="staff-avatar placeholder">{initials(profile?.full_name, profile?.email)}</div>}<div><h2>Welcome{profile?.full_name ? `, ${profile.full_name}` : ''}</h2><p className="muted">{profile?.position || 'Staff'} · {profile?.department || 'Department not set'}</p><p><strong>Academic Year:</strong> {academicYear} · {term}<br /><strong>Staff No:</strong> {profile?.staff_no || 'Not set'}<br /><strong>Salary Pay Date:</strong> {salaryDate ? new Date(salaryDate).toLocaleDateString() : 'Not announced'}</p>{isAdmin && <p className="status info">Admin accounts are exempted from attendance check-in and salary deductions.</p>}</div></div></div>
     {!isAdmin && <DeductionSummary profile={profile} />}
     <TopUsers />
-    <div className="panel"><h2>Weekly Attendance Scores</h2><p className="hint">Attendance and special activities help staff build points. Admin accounts are not included.</p><div className="table-card compact-table"><table><thead><tr><th>Rank</th><th>Staff</th><th>Present Days</th><th>Absent</th><th>Score</th></tr></thead><tbody>{scoreboard.map((row, index) => <tr key={row.staff_id}><td>{index + 1}</td><td>{row.name}</td><td>{row.present}</td><td>{row.absent}</td><td><strong>{row.score}</strong></td></tr>)}</tbody></table></div></div>
+    <div className="panel"><h2>Weekly Staff Points</h2><p className="hint">Point rule: +10 for each present attendance day, -3 for absence, and +{WEEKLY_REPORT_POINTS} for each weekly report submitted. Admin accounts are not included.</p><div className="table-card compact-table"><table><thead><tr><th>Rank</th><th>Staff</th><th>Present Days</th><th>Absent</th><th>Reports</th><th>Report Points</th><th>Total Score</th></tr></thead><tbody>{scoreboard.map((row, index) => <tr key={row.staff_id}><td>{index + 1}</td><td>{row.name}</td><td>{row.present}</td><td>{row.absent}</td><td>{row.reports}</td><td><strong>{row.reportPoints}</strong></td><td><strong>{row.score}</strong></td></tr>)}</tbody></table></div></div>
     <FloatingTeacherPost profile={profile} onPosted={loadPosts} />
   </section>;
 }
