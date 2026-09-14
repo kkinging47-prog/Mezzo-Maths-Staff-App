@@ -19,8 +19,11 @@ create index if not exists idx_finance_billing_discounts
 on public.finance_school_billing(fee_discount, book_discount)
 where fee_discount > 0 or book_discount > 0;
 
--- Optional helper view for quick school balance checks.
-create or replace view public.finance_school_balances as
+-- Rebuild the helper view because PostgreSQL cannot use CREATE OR REPLACE VIEW
+-- when the new view changes an existing column order/name.
+drop view if exists public.finance_school_balances;
+
+create view public.finance_school_balances as
 select
   b.school_id,
   s.name as school_name,
@@ -67,3 +70,5 @@ select
 from public.finance_school_billing b
 left join public.schools s on s.id = b.school_id
 group by b.school_id, s.name;
+
+grant select on public.finance_school_balances to authenticated;
