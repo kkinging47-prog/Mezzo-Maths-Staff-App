@@ -90,6 +90,7 @@ export function PayrollAdmin() {
   const [year, setYear] = useState(currentYear());
   const [month, setMonth] = useState(currentMonth());
   const [paidOn, setPaidOn] = useState('');
+  const [selectedStaffId, setSelectedStaffId] = useState('');
   const [drafts, setDrafts] = useState<PayrollDraft[]>([]);
   const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState('');
@@ -110,7 +111,9 @@ export function PayrollAdmin() {
       supabase.from('attendance_deductions').select('*').eq('status', 'approved').order('work_date', { ascending: false }),
     ]);
     if (staffError) { setType('error'); setMessage(staffError.message); return; }
-    setStaff(((staffData || []) as Profile[]).filter((person) => person.role !== 'admin'));
+    const staffRows = ((staffData || []) as Profile[]).filter((person) => person.role !== 'admin');
+    setStaff(staffRows);
+    setSelectedStaffId((current) => current || staffRows[0]?.id || '');
     setPayrolls(payrollData || []);
     setLoanRepayments(loanData || []);
     setCreditUnionRows(creditData || []);
@@ -121,29 +124,41 @@ export function PayrollAdmin() {
 
   const existingCurrentRows = useMemo(() => payrolls.filter((row) => monthKey(row.month) === selectedMonthKey), [payrolls, selectedMonthKey]);
 
+  function makeDraft(person: Profile): PayrollDraft {
+    const previous = payrolls.find((row) => row.staff_id === person.id && monthKey(row.month) === previousMonth.slice(0, 7));
+    const current = payrolls.find((row) => row.staff_id === person.id && monthKey(row.month) === selectedMonthKey);
+    const source = current || previous;
+    return {
+      staff_id: person.id,
+      staff_name: staffLabel(person),
+      staff_no: person.staff_no || '',
+      email: person.email || '',
+      ssnit_number: person.ssnit_number || '',
+      month: selectedMonthStart,
+      basic_salary: String(Number(source?.basic_salary || 0)),
+      allowances: String(Number(source?.allowances || 0)),
+      deductions: String(Number(source?.deductions || 0)),
+      paid_on: paidOn,
+      previous_found: Boolean(previous),
+    };
+  }
+
   function buildDraftsFromPrevious() {
-    const nextDrafts = staff.map((person) => {
-      const previous = payrolls.find((row) => row.staff_id === person.id && monthKey(row.month) === previousMonth.slice(0, 7));
-      const current = payrolls.find((row) => row.staff_id === person.id && monthKey(row.month) === selectedMonthKey);
-      const source = current || previous;
-      return {
-        staff_id: person.id,
-        staff_name: staffLabel(person),
-        staff_no: person.staff_no || '',
-        email: person.email || '',
-        ssnit_number: person.ssnit_number || '',
-        month: selectedMonthStart,
-        basic_salary: String(Number(source?.basic_salary || 0)),
-        allowances: String(Number(source?.allowances || 0)),
-        deductions: String(Number(source?.deductions || 0)),
-        paid_on: paidOn,
-        previous_found: Boolean(previous),
-      };
-    });
+    const nextDrafts = staff.map(makeDraft);
     setDrafts(nextDrafts);
     setSelectedRows(Object.fromEntries(nextDrafts.map((row) => [row.staff_id, true])));
     setType('success');
     setMessage(`Generated ${nextDrafts.length} editable payslip drafts using ${previousMonth.slice(0, 7)} salary data where available.`);
+  }
+
+  function buildIndividualDraft() {
+    const person = staff.find((row) => row.id === selectedStaffId);
+    if (!person) { setType('error'); setMessage('Please select a staff member first.'); return; }
+    const draft = makeDraft(person);
+    setDrafts([draft]);
+    setSelectedRows({ [draft.staff_id]: true });
+    setType('success');
+    setMessage(`Generated an individual editable payslip for ${draft.staff_name}. Review and approve it when ready.`);
   }
 
   function updateDraft(staffId: string, patch: Partial<PayrollDraft>) {
@@ -217,7 +232,7 @@ export function PayrollAdmin() {
       if (error) throw error;
       await supabase.from('notifications').insert(rows.map((row) => ({ user_id: row.staff_id, title: 'Payslip approved', body: `Your ${selectedMonthName} ${year} payslip is now available under Letters & Payslips.` })));
       setType('success');
-      setMessage(`${rows.length} payslips approved and published.`);
+      setMessage(`${rows.length} payslip${rows.length === 1 ? '' : 's'} approved and published.`);
       setDrafts([]);
       await loadData();
     } catch (error: any) {
@@ -252,8 +267,12 @@ export function PayrollAdmin() {
         <label>Month<select value={month} onChange={(e) => setMonth(e.target.value)}>{months.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label>Default Paid On<input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} /></label>
       </div>
+      <div className="payroll-individual-box">
+        <label>Generate Individual Payslip<select value={selectedStaffId} onChange={(e) => setSelectedStaffId(e.target.value)}>{staff.map((person) => <option key={person.id} value={person.id}>{staffLabel(person)}{person.staff_no ? ` · ${person.staff_no}` : ''}</option>)}</select></label>
+        <button type="button" className="primary" onClick={buildIndividualDraft} disabled={!selectedStaffId}>Generate Selected Staff Payslip</button>
+      </div>
       <div className="button-row payroll-button-row"><button type="button" className="primary" onClick={buildDraftsFromPrevious}>Generate All Payslips from Previous Month</button><button type="button" className="secondary" onClick={() => setDrafts([])}>Clear Drafts / View Approved Summary</button></div>
-      <p className="hint">The system uses the previous month’s basic salary, allowances and admin deductions. You can edit any staff member before approval.</p>
+      <p className="hint">Use the individual option for one staff member, or generate all staff at once. The system uses previous/current month salary data where available, then lets you edit before approval.</p>
     </div>
 
     <div className="payroll-metrics-grid">
@@ -264,7 +283,7 @@ export function PayrollAdmin() {
     </div>
 
     {drafts.length > 0 && <form className="panel payroll-draft-panel" onSubmit={approveAll}>
-      <div className="section-title-row payroll-title-row"><div><h2>Editable Payslip Drafts for {selectedMonthName} {year}</h2><p className="hint">Each teacher is shown as a card to prevent the layout from squeezing or breaking.</p></div><button className="primary" disabled={busy}>{busy ? 'Approving...' : 'Approve Selected Payslips'}</button></div>
+      <div className="section-title-row payroll-title-row"><div><h2>{drafts.length === 1 ? 'Editable Individual Payslip' : `Editable Payslip Drafts for ${selectedMonthName} ${year}`}</h2><p className="hint">Review salary and deductions, then approve to publish it to the staff page.</p></div><button className="primary" disabled={busy}>{busy ? 'Approving...' : drafts.length === 1 ? 'Approve This Payslip' : 'Approve Selected Payslips'}</button></div>
       <div className="payroll-draft-grid">
         {summaryRows.map((row) => <article key={row.staff_id} className={`payroll-draft-card ${selectedRows[row.staff_id] ? 'selected' : ''}`}>
           <div className="payroll-card-head"><label className="payroll-check"><input type="checkbox" checked={Boolean(selectedRows[row.staff_id])} onChange={(e) => setSelectedRows((prev) => ({ ...prev, [row.staff_id]: e.target.checked }))} /> Use</label><span className="pill">{row.previous_found ? 'Previous data' : 'New draft'}</span></div>
