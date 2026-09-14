@@ -268,6 +268,174 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   min-width: 0;
 }
 
+/* Payroll page specific fixes: prevents columns from becoming one-letter wide. */
+.payroll-page {
+  width: 100%;
+  max-width: 1280px !important;
+  overflow-x: hidden;
+}
+
+.payroll-page .panel,
+.payroll-page .metric-card,
+.payroll-page .table-card {
+  box-sizing: border-box;
+}
+
+.payroll-header {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.payroll-controls-grid {
+  max-width: 100%;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+}
+
+.payroll-button-row {
+  margin-top: 4px;
+}
+
+.payroll-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 16px;
+  width: 100%;
+  margin: 16px 0;
+}
+
+.payroll-title-row {
+  align-items: center;
+  gap: 16px;
+}
+
+.payroll-title-row > div {
+  min-width: 0;
+}
+
+.payroll-draft-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+  gap: 18px;
+  width: 100%;
+}
+
+.payroll-draft-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #dbe4ef;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.payroll-draft-card.selected {
+  border-color: #0f766e;
+  background: #f0fdfa;
+}
+
+.payroll-draft-card h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.payroll-card-head,
+.payroll-net-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.payroll-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.payroll-check input {
+  width: auto;
+}
+
+.payroll-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.payroll-entry-grid label {
+  width: 100%;
+}
+
+.payroll-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 8px 14px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.payroll-breakdown span,
+.payroll-net-box span,
+.payroll-net-box strong {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.payroll-net-box {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.payroll-net-box span {
+  color: #cbd5e1;
+}
+
+.payroll-net-box strong {
+  font-size: 18px;
+}
+
+.payroll-summary-panel {
+  overflow: hidden;
+}
+
+.payroll-summary-table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.payroll-summary-table table {
+  width: max-content;
+  min-width: 1180px;
+  table-layout: auto;
+}
+
+.payroll-summary-table th,
+.payroll-summary-table td,
+.payroll-draft-panel th,
+.payroll-draft-panel td {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  vertical-align: top;
+}
+
+.payroll-summary-table td:first-child,
+.payroll-summary-table th:first-child {
+  min-width: 220px;
+  white-space: normal;
+}
+
 .admin-toast-popup {
   position: fixed;
   top: 18px;
@@ -338,6 +506,11 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   .grid.three {
     grid-template-columns: repeat(2, minmax(240px, 1fr));
   }
+
+  .payroll-metrics-grid,
+  .payroll-draft-grid {
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+  }
 }
 
 @media (max-width: 980px) {
@@ -352,7 +525,9 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   .grid.three,
   .grid.four,
   .payroll-form-grid,
-  .payroll-controls-grid {
+  .payroll-controls-grid,
+  .payroll-metrics-grid,
+  .payroll-draft-grid {
     grid-template-columns: 1fr;
   }
 
@@ -370,6 +545,11 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   .form-grid > p,
   .form-grid > h2 {
     max-width: 100%;
+  }
+
+  .payroll-entry-grid,
+  .payroll-breakdown {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -409,6 +589,10 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
   .payroll-table-card table {
     min-width: 1040px;
   }
+
+  .payroll-summary-table table {
+    min-width: 1080px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -440,5 +624,9 @@ form.panel.form-grid:not(.staff-admin-panel) > *,
 
   .payroll-table-card table {
     min-width: 980px;
+  }
+
+  .payroll-draft-card {
+    padding: 14px;
   }
 }
