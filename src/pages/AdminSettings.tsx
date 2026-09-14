@@ -3,7 +3,9 @@ import { useAuth } from '../lib/auth';
 import { downloadCsv, compressImage } from '../lib/images';
 import { supabase } from '../lib/supabase';
 import { CompanyLogo } from '../components/CompanyLogo';
+import { AdminStaffManager } from '../components/AdminStaffManager';
 import { fileToDataUrl } from '../lib/adminSignature';
+import { Profile } from '../types';
 
 const terms = ['Term 1','Term 2','Term 3'];
 
@@ -22,15 +24,17 @@ export function AdminSettings() {
   const [signaturePreview, setSignaturePreview] = useState('');
   const [posts, setPosts] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
+  const [staff, setStaff] = useState<Profile[]>([]);
   const [message, setMessage] = useState('');
   const [logoBusy, setLogoBusy] = useState(false);
   const [signatureBusy, setSignatureBusy] = useState(false);
 
   async function load() {
-    const [{ data: settings }, { data: postData }, { data: activityData }] = await Promise.all([
+    const [{ data: settings }, { data: postData }, { data: activityData }, { data: staffData, error: staffError }] = await Promise.all([
       supabase.from('company_settings').select('key,value').in('key', ['salary_pay_date','company_logo_url','current_academic_year','current_term','admin_signature_url','admin_signature_name','admin_signature_data_url']),
       supabase.from('company_posts').select('id,title,priority,created_at,image_url,archived_at').is('archived_at', null).order('created_at', { ascending: false }).limit(100),
       supabase.from('special_class_activities').select('id,title,photo_urls,created_at, schools(name), profiles(full_name,email)').order('created_at', { ascending: false }).limit(300),
+      supabase.from('profiles').select('*').order('full_name'),
     ]);
     const cfg = Object.fromEntries((settings || []).map((row: any) => [row.key, row.value]));
     setSalaryDate(cfg.salary_pay_date || '');
@@ -44,6 +48,8 @@ export function AdminSettings() {
     setSignaturePreview(cfg.admin_signature_data_url || cfg.admin_signature_url || '');
     setPosts(postData || []);
     setActivities(activityData || []);
+    if (staffError) setMessage(staffError.message);
+    else setStaff((staffData || []) as Profile[]);
   }
 
   useEffect(() => { load(); }, []);
@@ -161,8 +167,17 @@ export function AdminSettings() {
   if (profile?.role !== 'admin') return <div className="empty">This page is for admin only.</div>;
 
   return <section>
-    <div className="page-header"><div><h1>Admin Settings</h1><p>Salary date, academic term, logo, admin signature, dashboard archives and image export manifest.</p></div><button className="primary" onClick={exportImages}>Export Image Manifest CSV</button></div>
+    <div className="page-header"><div><h1>Admin Settings</h1><p>Staff management, salary date, academic term, logo, admin signature, dashboard archives and image export manifest.</p></div><button className="primary" onClick={exportImages}>Export Image Manifest CSV</button></div>
     {message && <div className="status info">{message}</div>}
+
+    <AdminStaffManager
+      staff={staff}
+      currentUserId={profile?.id}
+      onChanged={load}
+      onSuccess={(text) => setMessage(text)}
+      onError={(error) => setMessage(error?.message || 'Staff action failed.')}
+    />
+
     <div className="grid two">
       <form className="panel form-grid" onSubmit={saveAcademicSettings}>
         <h2>Academic Year & Term</h2>
