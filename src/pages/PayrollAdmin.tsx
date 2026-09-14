@@ -156,7 +156,7 @@ export function PayrollAdmin() {
     const adminDeduction = Number(row.deductions || 0);
     const ssnit = row.ssnit_number.trim() ? Number((basic * SSNIT_EMPLOYEE_RATE).toFixed(2)) : 0;
     const paye = calculatePayeMonthly(basic);
-    const loan = loanRepayments.filter((item) => item.staff_id === row.staff_id && monthKey(item.repayment_month) === selectedMonthKey).reduce((sum, item) => sum + Number(item.scheduled_amount || 0), 0);
+    const loan = loanRepayments.filter((item) => item.staff_id === row.staff_id && monthKey(item.repayment_month) === selectedMonthKey && (item.paid === true || Number(item.amount_paid || 0) > 0)).reduce((sum, item) => sum + Number(item.amount_paid || item.scheduled_amount || 0), 0);
     const credit = creditUnionRows.filter((item) => item.staff_id === row.staff_id && monthKey(item.contribution_month) === selectedMonthKey).reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const attendance = attendanceDeductions.filter((item) => item.staff_id === row.staff_id && monthKey(item.work_date) === selectedMonthKey).reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const gross = basic + allowances;
@@ -241,8 +241,8 @@ export function PayrollAdmin() {
     URL.revokeObjectURL(url);
   }
 
-  return <section>
-    <div className="page-header"><div><h1>Payroll</h1><p>Generate monthly payslips from the previous month, edit where necessary, approve and review salary totals.</p></div><button type="button" className="primary" onClick={downloadSummaryCsv} disabled={summaryRows.length === 0}>Download Summary CSV</button></div>
+  return <section className="payroll-page">
+    <div className="page-header payroll-header"><div><h1>Payroll</h1><p>Generate monthly payslips, edit each teacher clearly, approve, and review salary totals.</p></div><button type="button" className="primary" onClick={downloadSummaryCsv} disabled={summaryRows.length === 0}>Download Summary CSV</button></div>
     <StatusMessage message={message} type={type} />
 
     <div className="panel form-grid payroll-control-panel">
@@ -252,26 +252,46 @@ export function PayrollAdmin() {
         <label>Month<select value={month} onChange={(e) => setMonth(e.target.value)}>{months.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label>Default Paid On<input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} /></label>
       </div>
-      <div className="button-row"><button type="button" className="primary" onClick={buildDraftsFromPrevious}>Generate All Payslips from Previous Month</button><button type="button" className="secondary" onClick={() => setDrafts([])}>Clear Drafts / View Approved Summary</button></div>
+      <div className="button-row payroll-button-row"><button type="button" className="primary" onClick={buildDraftsFromPrevious}>Generate All Payslips from Previous Month</button><button type="button" className="secondary" onClick={() => setDrafts([])}>Clear Drafts / View Approved Summary</button></div>
       <p className="hint">The system uses the previous month’s basic salary, allowances and admin deductions. You can edit any staff member before approval.</p>
     </div>
 
-    <div className="grid four">
+    <div className="payroll-metrics-grid">
       <div className="metric-card"><span>Staff Count</span><strong>{selectedSummaryRows.length}</strong></div>
       <div className="metric-card"><span>Total Gross</span><strong>{money(totals.gross)}</strong></div>
       <div className="metric-card"><span>Total Deductions</span><strong>{money(totals.deductions)}</strong></div>
       <div className="metric-card"><span>Total Net Salary To Pay</span><strong>{money(totals.net)}</strong></div>
     </div>
 
-    {drafts.length > 0 && <form className="panel form-grid payroll-draft-panel" onSubmit={approveAll}>
-      <div className="section-title-row"><h2>Editable Payslip Drafts for {selectedMonthName} {year}</h2><button className="primary" disabled={busy}>{busy ? 'Approving...' : 'Approve Selected Payslips'}</button></div>
-      <div className="table-card compact-table payroll-table-card"><table><thead><tr><th>Use</th><th>Staff</th><th>Basic</th><th>Allowances</th><th>Other/Admin</th><th>Paid On</th><th>Auto Deductions</th><th>Net Pay</th></tr></thead><tbody>{summaryRows.map((row) => <tr key={row.staff_id}><td><input type="checkbox" checked={Boolean(selectedRows[row.staff_id])} onChange={(e) => setSelectedRows((prev) => ({ ...prev, [row.staff_id]: e.target.checked }))} /></td><td><strong>{row.staff_name}</strong><br /><span className="muted">{row.staff_no || row.email || (row.previous_found ? 'Previous salary found' : 'No previous salary')}</span></td><td><input type="number" value={row.basic_salary} onChange={(e) => updateDraft(row.staff_id, { basic_salary: e.target.value })} /></td><td><input type="number" value={row.allowances} onChange={(e) => updateDraft(row.staff_id, { allowances: e.target.value })} /></td><td><input type="number" value={row.deductions} onChange={(e) => updateDraft(row.staff_id, { deductions: e.target.value })} /></td><td><input type="date" value={row.paid_on} onChange={(e) => updateDraft(row.staff_id, { paid_on: e.target.value })} /></td><td><span>SSNIT: {money(row.ssnit)}</span><br /><span>PAYE: {money(row.paye)}</span><br /><span>Loan: {money(row.loan)}</span><br /><span>Credit Union: {money(row.credit)}</span><br /><span>Attendance: {money(row.attendance)}</span></td><td><strong>{money(row.net)}</strong><br /><span className="muted">Deduct: {money(row.totalDeductions)}</span></td></tr>)}</tbody></table></div>
+    {drafts.length > 0 && <form className="panel payroll-draft-panel" onSubmit={approveAll}>
+      <div className="section-title-row payroll-title-row"><div><h2>Editable Payslip Drafts for {selectedMonthName} {year}</h2><p className="hint">Each teacher is shown as a card to prevent the layout from squeezing or breaking.</p></div><button className="primary" disabled={busy}>{busy ? 'Approving...' : 'Approve Selected Payslips'}</button></div>
+      <div className="payroll-draft-grid">
+        {summaryRows.map((row) => <article key={row.staff_id} className={`payroll-draft-card ${selectedRows[row.staff_id] ? 'selected' : ''}`}>
+          <div className="payroll-card-head"><label className="payroll-check"><input type="checkbox" checked={Boolean(selectedRows[row.staff_id])} onChange={(e) => setSelectedRows((prev) => ({ ...prev, [row.staff_id]: e.target.checked }))} /> Use</label><span className="pill">{row.previous_found ? 'Previous data' : 'New draft'}</span></div>
+          <h3>{row.staff_name}</h3>
+          <p className="muted">{row.staff_no || row.email || '-'}</p>
+          <div className="payroll-entry-grid">
+            <label>Basic Salary<input type="number" value={row.basic_salary} onChange={(e) => updateDraft(row.staff_id, { basic_salary: e.target.value })} /></label>
+            <label>Allowances<input type="number" value={row.allowances} onChange={(e) => updateDraft(row.staff_id, { allowances: e.target.value })} /></label>
+            <label>Other/Admin Deduction<input type="number" value={row.deductions} onChange={(e) => updateDraft(row.staff_id, { deductions: e.target.value })} /></label>
+            <label>Paid On<input type="date" value={row.paid_on} onChange={(e) => updateDraft(row.staff_id, { paid_on: e.target.value })} /></label>
+          </div>
+          <div className="payroll-breakdown">
+            <span>SSNIT: <strong>{money(row.ssnit)}</strong></span>
+            <span>PAYE: <strong>{money(row.paye)}</strong></span>
+            <span>Loan: <strong>{money(row.loan)}</strong></span>
+            <span>Credit Union: <strong>{money(row.credit)}</strong></span>
+            <span>Attendance: <strong>{money(row.attendance)}</strong></span>
+          </div>
+          <div className="payroll-net-box"><span>Total deductions: {money(row.totalDeductions)}</span><strong>Net Pay: {money(row.net)}</strong></div>
+        </article>)}
+      </div>
     </form>}
 
-    <div className="panel staff-admin-panel">
+    <div className="panel staff-admin-panel payroll-summary-panel">
       <div className="section-title-row"><h2>Salary Summary for {selectedMonthName} {year}</h2><span className="pill">{existingCurrentRows.length} approved records</span></div>
       <p className="hint">This summary shows what the company will pay for the selected month. When drafts are open, the summary uses the editable draft values.</p>
-      {summaryRows.length === 0 ? <div className="empty">No approved payslips or generated drafts for this month yet.</div> : <div className="table-card compact-table payroll-table-card"><table><thead><tr><th>Staff</th><th>Basic</th><th>Allowances</th><th>Gross</th><th>SSNIT</th><th>PAYE</th><th>Loan</th><th>Credit Union</th><th>Attendance</th><th>Total Deductions</th><th>Net Pay</th></tr></thead><tbody>{summaryRows.map((row) => <tr key={row.staff_id}><td><strong>{row.staff_name}</strong><br /><span className="muted">{row.staff_no || row.email || '-'}</span></td><td>{money(row.basic_salary)}</td><td>{money(row.allowances)}</td><td>{money(row.gross)}</td><td>{money(row.ssnit)}</td><td>{money(row.paye)}</td><td>{money(row.loan)}</td><td>{money(row.credit)}</td><td>{money(row.attendance)}</td><td>{money(row.totalDeductions)}</td><td><strong>{money(row.net)}</strong></td></tr>)}</tbody></table></div>}
+      {summaryRows.length === 0 ? <div className="empty">No approved payslips or generated drafts for this month yet.</div> : <div className="table-card compact-table payroll-summary-table"><table><thead><tr><th>Staff</th><th>Basic</th><th>Allowances</th><th>Gross</th><th>SSNIT</th><th>PAYE</th><th>Loan</th><th>Credit Union</th><th>Attendance</th><th>Total Deductions</th><th>Net Pay</th></tr></thead><tbody>{summaryRows.map((row) => <tr key={row.staff_id}><td><strong>{row.staff_name}</strong><br /><span className="muted">{row.staff_no || row.email || '-'}</span></td><td>{money(row.basic_salary)}</td><td>{money(row.allowances)}</td><td>{money(row.gross)}</td><td>{money(row.ssnit)}</td><td>{money(row.paye)}</td><td>{money(row.loan)}</td><td>{money(row.credit)}</td><td>{money(row.attendance)}</td><td>{money(row.totalDeductions)}</td><td><strong>{money(row.net)}</strong></td></tr>)}</tbody></table></div>}
     </div>
   </section>;
 }
