@@ -21,6 +21,33 @@ function clearSupabaseAuthStorage() {
   } catch {}
 }
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function recordDailyLogin(userId: string) {
+  const loginDate = todayKey();
+  const storageKey = `mezzo-login-recorded-${userId}-${loginDate}`;
+  try {
+    if (localStorage.getItem(storageKey)) return;
+  } catch {}
+
+  try {
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('staff_login_logs').upsert({
+      staff_id: userId,
+      login_date: loginDate,
+      login_at: now,
+      last_seen_at: now,
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+    }, { onConflict: 'staff_id,login_date' });
+    if (error) throw error;
+    try { localStorage.setItem(storageKey, 'yes'); } catch {}
+  } catch (error) {
+    console.warn('Daily login record failed:', error);
+  }
+}
+
 async function withTimeout<T>(promise: Promise<T>, ms = 12000): Promise<T> {
   return Promise.race([
     promise,
@@ -39,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await withTimeout(supabase.from('profiles').select('*').eq('id', userId).single());
       if (error && error.code !== 'PGRST116') throw error;
       setProfile(data as Profile | null);
+      if (data) recordDailyLogin(userId);
     } catch (error) {
       console.error('Profile load failed:', error);
       setProfile(null);
