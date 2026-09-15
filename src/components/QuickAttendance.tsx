@@ -8,6 +8,7 @@ import { AttendanceRecord, School } from '../types';
 
 function isSupervisor(position?: string | null) { return String(position || '').toLowerCase().includes('supervisor'); }
 function schoolHasGps(school?: School | null) { return school?.latitude !== null && school?.latitude !== undefined && school?.longitude !== null && school?.longitude !== undefined; }
+function isDuplicateAttendanceError(error: any) { return String(error?.code || '').includes('23505') || String(error?.message || '').toLowerCase().includes('duplicate key') || String(error?.message || '').includes('attendance_staff_id_school_id_work_date'); }
 
 export function QuickAttendance() {
   const { profile } = useAuth();
@@ -48,11 +49,25 @@ export function QuickAttendance() {
     if (error) throw error;
   }
 
+  async function findTodaysRecord() {
+    if (!profile || !selectedSchool) return null;
+    const { data } = await supabase.from('attendance').select('*, schools(*)').eq('staff_id', profile.id).eq('school_id', selectedSchool.id).eq('work_date', todayGhanaDate()).maybeSingle();
+    return data as AttendanceRecord | null;
+  }
+
   async function checkIn() {
     if (!profile || !selectedSchool) return;
     if (!selfie) { setType('error'); setMessage('Please take your photo before checking in.'); return; }
     setBusy(true); setMessage('');
     try {
+      const existing = await findTodaysRecord();
+      if (existing) {
+        setOpenRecord(existing.check_out_at ? null : existing);
+        setType('info');
+        setMessage(`You have already checked in at ${selectedSchool.name} today.`);
+        await loadData();
+        return;
+      }
       const position = await getCurrentPosition();
       const missingGps = !schoolHasGps(selectedSchool);
       let distance = 0;
@@ -65,9 +80,18 @@ export function QuickAttendance() {
       }
       const selfieUrl = await uploadSelfie(selfie, profile.id);
       const { error } = await supabase.from('attendance').insert({ staff_id: profile.id, school_id: selectedSchool.id, work_date: todayGhanaDate(), check_in_lat: position.latitude, check_in_lng: position.longitude, check_in_distance_m: distance, selfie_url: selfieUrl, status: 'checked_in' });
-      if (error) throw error;
+      if (error) {
+        if (isDuplicateAttendanceError(error)) {
+          setType('info');
+          setMessage(`You have already checked in at ${selectedSchool.name} today.`);
+          await loadData();
+          return;
+        }
+        throw error;
+      }
       setType('success');
       setMessage(missingGps ? `Checked in successfully at ${selectedSchool.name}. This school's GPS location has also been saved from your current location.` : `Checked in successfully at ${selectedSchool.name}.`);
+      setSelfie(null);
       await loadData();
     } catch (error: any) { setType('error'); setMessage(error.message || 'Check-in failed.'); }
     finally { setBusy(false); }
