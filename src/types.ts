@@ -17,6 +17,13 @@ export interface Profile {
   guardian_name?: string | null;
   guardian_contact?: string | null;
   ssnit_number?: string | null;
+  bank_name?: string | null;
+  bank_branch?: string | null;
+  bank_account_name?: string | null;
+  bank_account_number?: string | null;
+  momo_network?: string | null;
+  momo_name?: string | null;
+  momo_number?: string | null;
   position?: string | null;
   department?: string | null;
   photo_url?: string | null;
