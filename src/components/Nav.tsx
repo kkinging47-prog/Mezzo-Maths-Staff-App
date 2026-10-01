@@ -56,6 +56,7 @@ export function Nav() {
         {isAdmin && <NavLink to="/file-analyzer" className={itemClass}><FileSearch size={18}/> File Analyzer</NavLink>}
         {isAdmin && <NavLink to="/finance-access" className={itemClass}><ShieldCheck size={18}/> Finance Users</NavLink>}
         {isAdmin && <NavLink to="/payroll" className={itemClass}><CreditCard size={18}/> Payroll</NavLink>}
+        {isAdmin && <NavLink to="/staff-details" className={itemClass}><Users size={18}/> Staff Details</NavLink>}
         {isAdmin && <NavLink to="/report-summary" className={itemClass}><BarChart3 size={18}/> Report Summary</NavLink>}
         {isAdmin && <NavLink to="/admin-documents" className={itemClass}><FileSignature size={18}/> Admin Documents</NavLink>}
         {isAdmin && <NavLink to="/school-settings" className={itemClass}><MapPin size={18}/> School Settings</NavLink>}
