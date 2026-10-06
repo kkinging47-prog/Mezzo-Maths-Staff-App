@@ -30,6 +30,7 @@ import { FileAnalyzer } from './pages/FileAnalyzer';
 import { SchoolSettings } from './pages/SchoolSettings';
 import { WorkbookOrders } from './pages/WorkbookOrders';
 import { StaffDetails } from './pages/StaffDetails';
+import { BirthdayCards } from './pages/BirthdayCards';
 import { ReportSummary } from './pages/ReportSummary';
 import { AdminDocuments } from './pages/AdminDocuments';
 import { AdminSettings } from './pages/AdminSettings';
@@ -66,6 +67,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/file-analyzer" element={<ProtectedRoute adminOnly><FileAnalyzer /></ProtectedRoute>} />
             <Route path="/school-settings" element={<ProtectedRoute adminOnly><SchoolSettings /></ProtectedRoute>} />
             <Route path="/staff-details" element={<ProtectedRoute adminOnly><StaffDetails /></ProtectedRoute>} />
+            <Route path="/birthday-cards" element={<ProtectedRoute adminOnly><BirthdayCards /></ProtectedRoute>} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/meetings" element={<Meetings />} />
             <Route path="/workbooks" element={<WorkbookOrders />} />
