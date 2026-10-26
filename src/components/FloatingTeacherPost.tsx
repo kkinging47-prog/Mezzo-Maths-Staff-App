@@ -4,9 +4,21 @@ import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 
 function isTeacher(profile?: Profile | null) {
-  const position = String(profile?.position || '').toLowerCase();
-  const department = String(profile?.department || '').toLowerCase();
-  return profile?.role === 'admin' || position.includes('tutor') || position.includes('teacher') || department.includes('teaching');
+  if (!profile || String(profile.status || 'active').toLowerCase() !== 'active') return false;
+  const position = String(profile.position || '').toLowerCase();
+  const department = String(profile.department || '').toLowerCase();
+  return profile.role === 'admin' || position.includes('tutor') || position.includes('teacher') || department.includes('teaching');
+}
+
+function friendlyPostError(error: any): string {
+  const message = String(error?.message || '');
+  if (/bucket not found|storage bucket.*not found/i.test(message)) {
+    return 'Photo uploads are not configured (missing dashboard-posts bucket). Please ask an administrator to run the dashboard posting SQL fix in Supabase.';
+  }
+  if (/row.level security|42501|permission denied/i.test(message)) {
+    return 'Your account cannot publish this post yet. Please ask an administrator to apply the dashboard posting permission fix in Supabase.';
+  }
+  return message || 'Could not post to dashboard. Please try again.';
 }
 
 export function FloatingTeacherPost({ profile, onPosted }: { profile: Profile | null; onPosted: () => Promise<void> | void }) {
@@ -57,7 +69,7 @@ export function FloatingTeacherPost({ profile, onPosted }: { profile: Profile | 
       setTitle(''); setBody(''); setImage(null); setPreview(''); setOpen(false);
       await onPosted();
     } catch (error: any) {
-      setMessage(error.message || 'Could not post to dashboard.');
+      setMessage(friendlyPostError(error));
     } finally {
       setBusy(false);
     }
