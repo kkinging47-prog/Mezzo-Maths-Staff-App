@@ -35,6 +35,7 @@ import { ReportSummary } from './pages/ReportSummary';
 import { AdminDocuments } from './pages/AdminDocuments';
 import { AdminSettings } from './pages/AdminSettings';
 import { Admin } from './pages/Admin';
+import { BulkSms } from './pages/BulkSms';
 import './styles.css';
 import './extra.css';
 import './responsive-fixes.css';
@@ -74,6 +75,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/report-summary" element={<ProtectedRoute adminOnly><ReportSummary /></ProtectedRoute>} />
             <Route path="/admin-documents" element={<ProtectedRoute adminOnly><AdminDocuments /></ProtectedRoute>} />
             <Route path="/admin-settings" element={<ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>} />
+            <Route path="/bulk-sms" element={<ProtectedRoute adminOnly><BulkSms /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
