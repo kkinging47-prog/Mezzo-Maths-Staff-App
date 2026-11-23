@@ -15,5 +15,10 @@
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/sms.ts": {
+      "maxDuration": 60
+    }
+  }
 }

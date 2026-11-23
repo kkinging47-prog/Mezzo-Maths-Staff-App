@@ -62,6 +62,7 @@ export function Nav() {
         {isAdmin && <NavLink to="/admin-documents" className={itemClass}><FileSignature size={18}/> Admin Documents</NavLink>}
         {isAdmin && <NavLink to="/school-settings" className={itemClass}><MapPin size={18}/> School Settings</NavLink>}
         {isAdmin && <NavLink to="/admin-settings" className={itemClass}><Settings size={18}/> Admin Settings</NavLink>}
+        {isAdmin && <NavLink to="/bulk-sms" className={itemClass}><MessageSquare size={18}/> Bulk SMS</NavLink>}
         {isAdmin && <NavLink to="/admin" className={itemClass}><Users size={18}/> Admin</NavLink>}
       </nav>
       <button className="nav-link signout" onClick={signOut}><LogOut size={18}/> Sign out</button>
